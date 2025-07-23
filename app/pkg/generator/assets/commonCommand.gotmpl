@@ -1,0 +1,23 @@
+
+/* Package common contains utilities and common functions used across different commands. */
+package common
+
+import (
+	"{{ .GlobalConfig.GetConfigImportPath }}"
+	"github.com/spf13/cobra"
+)
+
+func RunHooksFn(prefix string, hookType config.HookType, cfg *config.CommandConfig) func(cmd *cobra.Command, args []string) {
+	return func(cmd *cobra.Command, args []string) {
+		if parent := cmd.Parent(); hookType == config.PersistentPreRun && parent != nil && parent.PersistentPreRun != nil {
+			parent.PersistentPreRun(parent, args)
+		}
+		fns := cfg.Extensions.GetHooksByType(prefix, hookType)
+		for _, fn := range fns {
+			fn()
+		}
+		if parent := cmd.Parent(); hookType == config.PersistentPostRun && parent != nil && parent.PersistentPostRun != nil {
+			parent.PersistentPostRun(parent, args)
+		}
+	}
+}

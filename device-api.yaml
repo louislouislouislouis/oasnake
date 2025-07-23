@@ -1,0 +1,1421 @@
+openapi: 3.0.1
+info:
+  version: "22.3.2"
+  title: DeviceService
+  description: Provides functionality to read and manage devices.
+  x-kiwigrid-apigw-service-name: "deviceservice"
+tags:
+  - name: DeviceService
+    description: |
+      The DeviceService, providing service functions to manage devices and their users.
+paths:
+  "/{guid}/bound":
+    get:
+      tags:
+        - DeviceService
+      summary: "Retrieves device access state."
+      description: |
+        Checks whether the device with the given GUID is already bound to some
+        user. The actual check is performed by the device runtime associated with the device.
+      operationId: isDeviceBound
+      security:
+        - oauth2: ["ds_read_channel_bind_device"]
+        - access_token: []
+      parameters:
+        - name: guid
+          in: path
+          description: the GUID of the device to check the binding state for
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: "contains true if device is bound, false otherwise"
+          content:
+            "application/json":
+              schema:
+                type: boolean
+        "400":
+          description: input is not valid or processable
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: "not authorized to access this api"
+        "403":
+          description: "no enough permissions to access this method"
+        "404":
+          description: "if no device with the given GUID exists"
+        "412":
+          description: "if the device has no device runtime."
+    post:
+      tags:
+        - DeviceService
+      summary: "Bootstraps device access"
+      description: |
+        Binds the device with the given GUID to some entity that shall access the device. Typically this is a user identified by his/her userId. The actual binding is performed by the device runtime associated with the device and may therefore differ. However, it is expected that the binding modifies the ACLs of the device such that the accessor (e.g., a user) has access to the device after a successful binding.
+
+        Binding a device typically differs from a plain modification of the ACLs (which could also be performed using {@link #mergeDevice(String, PartialDevice)}). For example, {@link #bindDevice(String, BindParameters)} allows to modify devices which are not directly accessible. Such modifications are authorized by providing a device secret. Also, binding a single device might modify multiple devices. For example, the EMRuntime does not only modify the ACLs of the Energy Manager that is subject to the binding, but also modified the ACLs of all devices attached to the Energy Manager.
+
+         Binding devices is only allowed if the current user (calling this API method) is allowed to 'access' the accessor. Currently this is determined based on the current users permissions. If the user has the {@link DeviceServicePermissions#DS_WRITE_ALL_BIND_DEVICE} he/she can bind devices to all accessors. If the user has the {@link DeviceServicePermissions#DS_WRITE_CHANNEL_BIND_DEVICE} he/she can bind devices to all accessors in the same channel (or channels he/she has access to).
+      operationId: bindDevice
+      security:
+        - oauth2: ["ds_write_channel_bind_device"]
+        - access_token: []
+      parameters:
+        - name: guid
+          in: path
+          description: the GUID of the device to bind
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BindParameters"
+        description: >-
+          a secret that authenticates the accessor as having access to the
+          device and the ID of
+           the accessor to bind the device to
+        required: true
+      responses:
+        "200":
+          description: device was successfully bound or is already bound to the accessor.
+        "204":
+          description: successful without any content
+        "400":
+          description: if parameters required for binding are missing.
+        "401":
+          description: you are not authorized to access this api
+        "403":
+          description: if the secret is wrong.
+        "404":
+          description: if the device cannot be found or is not accessible by the current
+            user (e.g., because it is in a different channel and the permission
+            DS_WRITE_ALL_BIND_DEVICE is missing) or if the accessor was not
+            found or is not accessible.
+        "409":
+          description: if the device is already bound to a different accessor.
+        "412":
+          description: if the device has no device runtime.
+  "/devices":
+    get:
+      tags:
+        - DeviceService
+      summary: "list devices"
+      description: "Lists devices the calling user has at least READ rights on."
+      operationId: getDevices
+      security:
+        - oauth2: ["read_devices"]
+        - access_token: []
+      parameters:
+        - name: filter
+          in: query
+          description: filter criteria for devices.
+          required: false
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceFilter"
+        - name: projection
+          in: query
+          description: fields of Device to be returned
+          required: false
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceProjection"
+        - name: offset
+          in: query
+          description: "deprecated: offset for the items returned. Use anchor instead"
+          deprecated: true
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          description: number of items returned (page size). If given must be between 0 and
+            1000 inclusive.
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 1000
+            default: 50
+        - name: anchor
+          in: query
+          description: >-
+            for paging result sets. All items returned are bigger or smaller
+            with respect to the sorting than
+             the anchor device. Note, the anchor device needs to contain all fields used for sorting, i.e. the projection
+             used for the anchor needs to include all fields used for sorting.
+          required: false
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+        - name: sorting
+          in: query
+          description: |
+            list of properties to sort the result set by. The elements in this list are `{"<field>": <1|-1>}` maps where the number specifies the sort order (1 for ascending, -1 for descending). The default sorting is by ascending guid, if no sorting is specified.
+          required: false
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceSorting'
+      responses:
+        "200":
+          description: successful with the result as payload
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/DeviceResultList"
+        "400":
+          description: input is not valid or processable
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: you are not authorized to access this api
+        "403":
+          description: you got no permissions to access this method
+    post:
+      tags:
+        - DeviceService
+      summary: "Create a device"
+      description: |
+        Creates an instance of the given device class, name and owner. The given device runtime is responsible for creating the concrete instance.
+      operationId: createDevice
+      security:
+        - oauth2: ["manage_devices"]
+        - access_token: []
+      parameters:
+        - name: deviceRuntimeId
+          in: query
+          description: the identifier of the device runtime in the form of a fully
+            qualified name
+          required: true
+          schema:
+            type: string
+        - name: deviceClassId
+          in: query
+          description: the identifier of the target device class
+          required: true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceClassId"
+        - name: name
+          in: query
+          description: the target name of the device
+          required: true
+          schema:
+            type: string
+        - name: owner
+          in: query
+          description: the target owner of the device
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: successful with the result as payload
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/Device"
+        "400":
+          description: input is not valid or processable
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: you are not authorized to access this api
+        "403":
+          description: you got no permissions to access this method
+  "/devices/search":
+    post:
+      tags:
+        - DeviceService
+      summary: "Searches for devices according to given criteria"
+      description: |
+        Lists devices that the calling user is permitted to read.
+
+        This is the same as `GET /devices` but uses the `POST` method
+        to keep the URL short and allow for bigger queries.
+      operationId: searchDevices
+      security:
+        - oauth2: ["read_devices"]
+        - access_token: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceSearch'
+            examples:
+              GuidEqualFilterWithOwnerAscendingAndTagValueDescendingSorting:
+                $ref: '#/components/examples/GuidEqualFilterWithOwnerAscendingAndTagValueDescendingSorting'
+              GuidEqualOneOfSeveralFilter:
+                $ref: '#/components/examples/GuidEqualOneOfSeveralFilter'
+              DeviceClassEqualFilter:
+                $ref: '#/components/examples/DeviceClassEqualFilter'
+              DeviceClassEqualOneAndNotEqualAnotherFilter:
+                $ref: '#/components/examples/DeviceClassEqualOneAndNotEqualAnotherFilter'
+              TagNameEqualFilter:
+                $ref: '#/components/examples/TagNameEqualFilter'
+              TagValueExistsFilter:
+                $ref: '#/components/examples/TagValueExistsFilter'
+              DeviceClassEqualAndTagValueGreaterOrEqualFilter:
+                $ref: '#/components/examples/DeviceClassEqualAndTagValueGreaterOrEqualFilter'
+              GuidAndTagValueProjection:
+                $ref: '#/components/examples/GuidAndTagValueProjection'
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of devices to return.
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 1000
+            default: 50
+      responses:
+        "200":
+          description: Successful query
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/DeviceResultList"
+        "400":
+          description: Invalid input
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: No permissions to access this API
+        "403":
+          description: No permissions to call this method
+  "/devices/{deviceId}":
+    get:
+      tags:
+        - DeviceService
+      summary: Get a device
+      operationId: getDevice
+      security:
+        - oauth2: ["read_devices"]
+        - access_token: []
+      parameters:
+        - name: deviceId
+          in: path
+          description: |
+            The GUID of the device.
+
+            Note that some special characters must be percent-encoded, otherwise
+            a 404 error will be returned due to an issue with the request
+            validation.
+            See https://agile.kiwigrid.com/browse/CLD-6869 for details.
+
+            If for some reason you cannot encode the characters, consider using
+            the device search endpoint where the GUID can be passed in the
+            request body without encoding.
+          required: true
+          schema:
+            type: string
+        - name: projection
+          in: query
+          description: |
+            A map defining the fields of the device to be returned. The map keys
+            are device field names with values of 0 or 1 to add or remove the
+            field from the projection respectively.
+
+            If not provided, the device is returned with its GUID and device
+            class fields only.
+          required: false
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceProjection"
+      responses:
+        "200":
+          description: Successful with the result as payload
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/Device"
+        "400":
+          description: Input is not valid or processable
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authorized to access this API
+        "403":
+          description: No permission to access this method
+        "404":
+          description: |
+            The device doesn't exist or access rights for it are not sufficient.
+
+            This error can also appear if special characters in the GUID are not
+            encoded. See the note in the description of the GUID parameter.
+    delete:
+      tags:
+        - DeviceService
+      summary: Delete a device
+      operationId: deleteDevice
+      security:
+        - oauth2: ["manage_devices"]
+        - access_token: []
+      parameters:
+        - name: deviceId
+          in: path
+          description: the GUID of device to be deleted
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: successful with the result as payload
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/Device"
+        "400":
+          description: input is not valid or processable
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: you are not authorized to access this api
+        "403":
+          description: you got no permissions to access this method
+    patch:
+      tags:
+        - DeviceService
+      summary: "Update a device"
+      description: |
+        Partially update a single device (body contains only fields to be updated).
+
+        The following update scenarios are available and require the proper acl rights for:
+        * update ownership - `own`
+        * update acl list - `wacl`
+        * update tag values - `wtag`
+
+        Take care that your possibly generated client does not send `null` instead of leaving out a property.
+      operationId: mergeDevice
+      security:
+        - oauth2: ["manage_devices"]
+        - access_token: []
+      parameters:
+        - name: deviceId
+          in: path
+          description: the GUID of device to be updated
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartialDevice"
+        description: the device object. It must contain tag values
+        required: true
+      responses:
+        "200":
+          description: successful with the result as payload
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/DeviceEvent"
+        "400":
+          description: if device to update contains no tags
+        "401":
+          description: you are not authorized to access this api
+        "403":
+          description: you got no permissions to access this method
+        "404":
+          description: if a device with the given GUID doesn't exist or access rights are
+            not sufficient
+  "/devices/{deviceId}/hard":
+    delete:
+      tags:
+        - DeviceService
+      summary: Delete a device for ever
+      operationId: deleteDeviceHard
+      security:
+        - oauth2: [ "private_hard_delete_method" ]
+        - access_token: [ ]
+      parameters:
+        - name: deviceId
+          in: path
+          description: the GUID of device to be deleted for ever
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: successful
+        "400":
+          description: input is not valid or processable
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: you are not authorized to access this api
+        "403":
+          description: you got no permissions to access this method
+        "500":
+          description: something unespected went wrong
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  "/devices/force/{deviceId}":
+    delete:
+      tags:
+        - DeviceService
+      summary: "Forces device deletion"
+      description: >-
+        Deletes the device with the given GUID directly from the persistence
+        store without deleting it from the device
+         runtime.
+      operationId: forceDeleteDevice
+      security:
+        - oauth2: [ "manage_all_devices" ]
+        - access_token: []
+      parameters:
+        - name: deviceId
+          in: path
+          description: the GUID of device to be deleted
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: successful without any content
+        "400":
+          description: input is not valid or processable
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: you are not authorized to access this api
+        "403":
+          description: you got no permissions to access this method
+  "/deviceruntimes/{deviceRuntimeId}/instantiatableModels":
+    get:
+      tags:
+        - DeviceService
+      summary: "List instantiable device classes"
+      description: Returns all the device class identifiers instantiable by the given
+        device runtime.
+      operationId: getConcreteDeviceClasses
+      security:
+        - oauth2: ["read_devices"]
+        - access_token: []
+      parameters:
+        - name: deviceRuntimeId
+          in: path
+          description: the identifier of the device runtime in the form of a fully
+            qualified name
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: successful with the result as payload
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/GetConcreteDeviceClassesResponse200"
+        "400":
+          description: input is not valid or processable
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: you are not authorized to access this api
+        "403":
+          description: you got no permissions to access this method
+  "/deviceClasses/{deviceClassId}":
+    get:
+      tags:
+        - DeviceService
+      summary: "Get a device class"
+      description: >-
+        Get a single device class by its device class id. The device class id
+        can be versioned (e.g. `com.comp.device.Device~1.0.0.0`) or unversioned (`com.comp.device.Device`).
+         In the latter case, the device class with the latest version is returned.
+      operationId: getDeviceClass
+      security:
+        - oauth2: ["read_devices"]
+        - access_token: []
+      parameters:
+        - name: deviceClassId
+          in: path
+          description: versioned or unversioned device class id
+          required: true
+          schema:
+            type: string
+        - name: includeSuperClasses
+          in: query
+          description: if true super classes will be included in the result list.
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: successful with the result as payload
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/DeviceClassResultList"
+        "400":
+          description: input is not valid or processable
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: you are not authorized to access this api
+        "403":
+          description: you got no permissions to access this method
+  "/deviceClasses":
+    get:
+      tags:
+        - DeviceService
+      summary: "List device classes"
+      description: |
+        Get a list of device classes. Device classes to be returned can be specified by a pattern string.
+
+        Device class IDs are of the form `<package>.<class>~<version>`: `com.package.Device~1.0.0.0`
+
+        The version part of a deviceClassPattern can be left empty. It will be replaced with a wildcard matching any version of the device class. The only wild card character supported is the asterisk `*` matching any character.
+      operationId: getDeviceClasses
+      security:
+        - oauth2: ["read_devices"]
+        - access_token: []
+      parameters:
+        - name: pattern
+          in: query
+          description: >-
+            pattern matching a device class id (versioned or unversioned, with
+            or without
+             wild-card characters)
+          required: false
+          schema:
+            type: string
+        - name: includeSuperClasses
+          in: query
+          description: if true, resolve all super classes and include them in the result
+            set (unordered)
+          required: false
+          schema:
+            type: boolean
+        - name: latest
+          in: query
+          description: if true and multiple versions of a device class are found, return
+            only the latest version
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: result list containing matched device classes
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/DeviceClassResultList"
+        "400":
+          description: input is not valid or processable
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: you are not authorized to access this api
+        "403":
+          description: you got no permissions to access this method
+  "/deviceruntimes":
+    get:
+      tags:
+        - DeviceService
+      summary: "List device runtime identifiers"
+      description: Returns all known device runtime identifiers.
+      operationId: getDeviceRuntimes
+      security:
+        - oauth2: ["read_devices"]
+        - access_token: []
+      responses:
+        "200":
+          description: list of device runtime identifiers
+          content:
+            "application/json":
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          description: input is not valid or processable
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: you are not authorized to access this api
+        "403":
+          description: you got no permissions to access this method
+  "/reload/{guid}":
+    post:
+      tags:
+        - DeviceService
+      summary: "Reload a device"
+      description: |
+        Triggers reloading the specified device from database to device cache.
+      operationId: reloadDevice
+      security:
+        - oauth2: ["reload_devices"]
+        - access_token: []
+      parameters:
+        - name: guid
+          in: path
+          description: the GUID of the device to be reloaded
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: successful without any content
+        "400":
+          description: input is not valid or processable
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: you are not authorized to access this api
+        "403":
+          description: you got no permissions to access this method
+  "/user/{userId}":
+    delete:
+      tags:
+        - DeviceService
+      summary: "Removes a deleted user from the device cache"
+      description: |
+        Clean up the device cache after user deletion, by doing the following:
+        - The user is removed from all ACLs that reference the user
+        - The user is removed as owner from all devices that were owned by him
+        - The channel of the devices that were owned by the user are reset to their pre-bound channel
+      operationId: removeUserFromACLs
+      security:
+        - oauth2: ["ds_remove_user_from_acls"]
+        - access_token: []
+      parameters:
+        - name: userId
+          in: path
+          description: the GUID of the user which was deleted and should be removed
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: successful without any content
+        "400":
+          description: input is not valid or processable
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: you are not authorized to access this api
+        "403":
+          description: you got no permissions to access this method
+servers:
+  - description: "Generic API Endpoint"
+    url: "{schema}://{host}:{port}{basePath}"
+    variables:
+      schema:
+        default: "https"
+        enum: ["https", "http"]
+      host:
+        default: "cloud.kiwigrid.com"
+      port:
+        default: "443"
+      basePath:
+        default: "/rest/deviceservice"
+
+components:
+  schemas:
+    GetConcreteDeviceClassesResponse200:
+      type: array
+      items:
+        $ref: "#/components/schemas/DeviceClassId"
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        errorDetails:
+          type: array
+          items:
+            type: string
+    BindParameters:
+      type: object
+      properties:
+        accessor:
+          type: string
+        secret:
+          type: string
+    DeviceFilter:
+      type: object
+      description: |
+        The object representation of a boolean expression that defines the properties of devices to be returned.
+
+        The possible operators are listed under the schema `FilterOperator`.
+        Note that some rendered versions of this OpenAPI document don't show unused schemas like that one,
+        so you might have to look into the original document to find it.
+
+        In general, the expressions are inspired by
+        [MongoDB's query filter documents](https://docs.mongodb.com/manual/tutorial/query-documents).
+        This means that the syntax and several operators are similar, but they don't match completely.
+
+        Additionally, escaping is supported as follows:
+        `\` can be used as an escape character for `.` so that the `.` character is treated as a literal character,
+        e.g. `tagValues.one\.two` filters for a tag value named `one.two`.
+      additionalProperties: true
+
+    # This leads to generation errors that the class `OneOfFieldConditionValueCondition` needed by `FieldCondition`
+    # cannot be found.
+    # The specification is nevertheless kept as a reference for valid filter expressions.
+#    DeviceFilterExpression:
+#      oneOf:
+#        - $ref: '#/components/schemas/FieldCondition'
+#        - $ref: '#/components/schemas/FieldConditionsAnd'
+#        - $ref: '#/components/schemas/FieldConditionsOr'
+#        - $ref: '#/components/schemas/FieldConditionNot'
+#      # Classes with only additional properties, are not generated. As inheritance without discriminator will not be
+#      # possible in the future, such a property has been added, but is not required to be compatible with the current
+#      # syntax.
+#      discriminator:
+#        propertyName: expressionObjectName
+#    FieldCondition:
+#      type: object
+#      properties:
+#        expressionObjectName:
+#          type: string
+#      additionalProperties:
+#        oneOf:
+#          - $ref: '#/components/schemas/FieldCondition'
+#          - $ref: '#/components/schemas/ValueCondition'
+#    ValueCondition:
+#      oneOf:
+#        - $ref: '#/components/schemas/AbbreviatedEquals'
+#        - $ref: '#/components/schemas/ExtendedEquals'
+#        - $ref: '#/components/schemas/EqualsNot'
+#        - $ref: '#/components/schemas/EqualsAnyOf'
+#        - $ref: '#/components/schemas/EqualsNoneOf'
+#        - $ref: '#/components/schemas/LessThan'
+#        - $ref: '#/components/schemas/LessThanOrEquals'
+#        - $ref: '#/components/schemas/GreaterThan'
+#        - $ref: '#/components/schemas/GreaterThanOrEquals'
+#        - $ref: '#/components/schemas/Exists'
+#        - $ref: '#/components/schemas/ContainsString'
+#        - $ref: '#/components/schemas/ValueConditionsAnd'
+#        - $ref: '#/components/schemas/ValueConditionsOr'
+#        - $ref: '#/components/schemas/ValueConditionsNot'
+#    # This should actually have a discriminator, so when discriminator fields become obligatory in the future,
+#    # such abbreviated conditions will not be possible anymore
+#    AbbreviatedEquals:
+#      description: The value against which the field specified by the key is tested for equality.
+#    ExtendedEquals:
+#      type: object
+#      properties:
+#        expressionObjectName:
+#          type: string
+#        $eq:
+#          description: The value against which the field specified by the parent key is tested for equality.
+#    EqualsNot:
+#      type: object
+#      properties:
+#        expressionObjectName:
+#          type: string
+#        $ne:
+#          description: The value against which the field specified by the parent key is tested for inequality.
+#    EqualsAnyOf:
+#      type: object
+#      properties:
+#        expressionObjectName:
+#          type: string
+#        $in:
+#          type: array
+#          description: |
+#            The values against which the field specified by the parent key is tested for equality.
+#
+#            The condition resolves to `true` when the field is equal to one of the values.
+#          items: {}
+#    EqualsNoneOf:
+#      type: object
+#      properties:
+#        expressionObjectName:
+#          type: string
+#        $nin:
+#          type: array
+#          description: |
+#            The values against which the field specified by the parent key is tested for inequality.
+#
+#            The condition resolves to `true` when the field is not equal to any of the values.
+#          items: {}
+#    LessThan:
+#      type: object
+#      properties:
+#        expressionObjectName:
+#          type: string
+#        $lt:
+#          description: The value used for the comparison whether the field specified by the parent key is lower.
+#    LessThanOrEquals:
+#      type: object
+#      properties:
+#        expressionObjectName:
+#          type: string
+#        $lte:
+#          description: |
+#            The value used for the comparison whether the field specified by the parent key is lower or equal.
+#    GreaterThan:
+#      type: object
+#      properties:
+#        expressionObjectName:
+#          type: string
+#        $gt:
+#          description: The value used for the comparison whether the field specified by the parent key is higher.
+#    GreaterThanOrEquals:
+#      type: object
+#      properties:
+#        expressionObjectName:
+#          type: string
+#        $gte:
+#          description: |
+#            The value used for the comparison whether the field specified by the parent key is higher or equal.
+#    Exists:
+#      type: object
+#      properties:
+#        expressionObjectName:
+#          type: string
+#        $exists:
+#          type: boolean
+#          description: |
+#            Defines whether the existence or absence of the field specified by the parent key should be checked.
+#    ContainsString:
+#      type: object
+#      properties:
+#        expressionObjectName:
+#          type: string
+#        $like:
+#          type: string
+#          description: |
+#            A string which should be contained in the field specified by the parent key.
+#
+#            `*` at the beginning or end is treated as a wildcard meaning any or no characters in that position.
+#          pattern: '^\*?.*\*?$'
+#    ValueConditionsAnd:
+#      type: object
+#      properties:
+#        expressionObjectName:
+#          type: string
+#        $and:
+#          type: array
+#          items:
+#            $ref: '#/components/schemas/ValueCondition'
+#    ValueConditionsOr:
+#      type: object
+#      properties:
+#        expressionObjectName:
+#          type: string
+#        $or:
+#          type: array
+#          items:
+#            $ref: '#/components/schemas/ValueCondition'
+#    ValueConditionsNot:
+#      type: object
+#      properties:
+#        expressionObjectName:
+#          type: string
+#        $not:
+#          $ref: '#/components/schemas/ValueCondition'
+#    FieldConditionsAnd:
+#      type: object
+#      properties:
+#        expressionObjectName:
+#          type: string
+#        $and:
+#          type: array
+#          items:
+#            $ref: '#/components/schemas/FieldCondition'
+#    FieldConditionsOr:
+#      type: object
+#      properties:
+#        expressionObjectName:
+#          type: string
+#        $or:
+#          type: array
+#          items:
+#            $ref: '#/components/schemas/FieldCondition'
+#    FieldConditionNot:
+#      type: object
+#      properties:
+#        expressionObjectName:
+#          type: string
+#        $not:
+#          $ref: '#/components/schemas/FieldCondition'
+
+    FilterOperator:
+      type: string
+      enum:
+        - $eq
+        - $ne
+        - $in
+        - $nin
+        - $lt
+        - $lte
+        - $gt
+        - $gte
+        - $and
+        - $or
+        - $not
+        - $exists
+        - $like
+    DeviceProjection:
+      type: object
+      description: |
+        An object specifying which data of each matching device should be returned.
+
+        The field names must correspond to those of `Device`.
+        The values are either objects describing fields of nested objects in `Device` or one of 0 and 1.
+
+        1 for a field means that the whole depth of its content will be returned.
+        With 0, specific fields, e.g. nested inside a selected field, can be supressed.
+
+        Not specifying a field has the same effect as setting 0, except for some basic fields like `guid`.
+
+        Additionally, wildcards, negation and escaping are supported as follows:
+        - `*` can be used as a wildcard anywhere in field name (also multiple times), e. g. `tagValues.prefix*`
+        - a `!` as before a field name will negate the projection expression, e. g. `tagValues.!*forbiddenWord*` will
+          project all tag values that do NOT contain the term 'forbiddenWord'
+        - `\` can be used as an escape character for `.` `*` `!` `\` so that the following character is treated as a
+          literal character. e.g. `tagValues.one\.two` projects a tagValue named: `one.two`
+
+      additionalProperties: true
+      # This https://github.com/OpenAPITools/openapi-generator/issues/634 is not yet completely resolved, therefore oneOf breaks the code generation
+      #        oneOf:
+      #          # this object schema should be a recursive $ref, but the tooling doesn't like it :-(
+      #          - type: "object"
+      #          - enum: [0, 1]
+    DeviceSearch:
+      type: object
+      description: |
+        An object specifying the characteristics of requested devices and in which form they should be returned.
+      properties:
+        filter:
+          $ref: '#/components/schemas/DeviceFilter'
+        projection:
+          $ref: '#/components/schemas/DeviceProjection'
+        anchor:
+          $ref: '#/components/schemas/AnchorDevice'
+        sorting:
+          $ref: '#/components/schemas/DeviceSorting'
+    AnchorDevice:
+      description: |
+        A device defining where the list of matching devices should begin.
+        Only devices following this device according to the provided sorting will be returned.
+
+        The device must contain all the fields used for sorting.
+      # This is a workaround to add a description to a referenced schema. It will not work in the future when inheritance
+      # without a discriminator property will not be allowed anymore. It will not be needed once this issue is solved:
+      # https://github.com/OAI/OpenAPI-Specification/issues/556
+      allOf:
+        - $ref: '#/components/schemas/Device'
+    DeviceSorting:
+      type: array
+      description: |
+        List of properties to sort the result set by.
+
+        `{ "guid": 1 }` is always implicitly added as the last sorting criterion.
+        This means that this is also the default sorting if none is provided.
+      items:
+        type: object
+        description: The key should be one of the device object keys.
+        # This is set to maintain compatibility and allow empty sortings (see CLD-5513)
+        minProperties: 0
+        maxProperties: 1
+        additionalProperties:
+          $ref: '#/components/schemas/SortOrder'
+      # The default cannot be defined because DeviceServiceImplTest#openApi3SchemaIsValid fails with
+      # "io.vertx.ext.web.api.contract.RouterFactoryException: attribute components.schemas.DeviceSorting.default is not of type `string`"
+      # while all current OpenAPI editors and validators do not report an error as expected.
+      default:
+        - guid: 1
+    SortOrder:
+      type: integer
+      description: Sort order of the given field with 1 signifying ascending and -1 descending order.
+      enum: [1, -1]
+    Tag:
+      type: object
+      description: Properties of the values provided by a tag.
+      properties:
+        mode:
+          type: string
+          enum:
+            - READ
+            - WRITE
+            - READ_WRITE
+        unit:
+          type: string
+          description: |
+            Physical unit of the measured value.
+
+            Although it can be freely chosen, the following values illustrate best practices for the naming:
+            * NOT_APPLICABLE
+            * ONE
+            * VOLT
+            * AMPERE
+            * CELSIUS
+            * WATT
+            * HERTZ
+            * WATTHOUR
+            * AMPEREHOUR
+            * RADIAN
+            * METER_PER_SECOND
+            * DATETIME
+            * PERCENT
+            * SECOND
+            * MINUTE
+            * HOUR
+            * DAY
+            * MILLISECOND
+            * OHM
+            * CUBICMETER
+            * CUBICMETER_PER_HOUR
+            * PASCAL
+            * WATTHOUR_PER_CUBICMETER
+          example:
+            'METER_PER_SECOND'
+        documentation:
+          type: string
+          description: A more detailed textual description.
+        measurand:
+          type: string
+          description: Description of what the tag measures.
+        tagName:
+          type: string
+        type:
+          type: string
+          description: |
+            A Java type that can be constructed with the
+            [Jackson library's type factory](http://fasterxml.github.io/jackson-databind/javadoc/2.10/com/fasterxml/jackson/databind/type/TypeFactory.html).
+          example:
+            'List<Map<String, Integer>>'
+        sampleRate:
+          type: integer
+          description: |
+            Default rate in milliseconds with which values for the tag should be collected.
+
+            A value of 0 means no auto-sampling.
+          format: int32
+    DeviceClassId:
+      type: object
+      properties:
+        deviceClass:
+          type: string
+        version:
+          type: string
+    DeviceClass:
+      type: object
+      properties:
+        deviceClass:
+          description: Name of the class of this device in namespace notation (separated by ".").
+          type: string
+        version:
+          type: string
+          example: 5.12.0.2
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tag"
+        superClasses:
+          type: array
+          items:
+            type: string
+            pattern: '^.+~.+$'
+    DeviceClassResultList:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int32
+        limit:
+          type: integer
+          format: int32
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeviceClass"
+    DeviceAcl:
+      type: object
+      description: |
+        An object where the keys describe access rights and the values the entities being granted the related right.
+        The keys will be interpreted as follows:
+        * `rtag`: Read permission
+        * `wtag`: Tag values write permission
+        * `wacl`: Access control list write permission
+        * `own`:  Device owner
+
+        For the device owner field, at most one entity is allowed. It duplicates the function of the `owner` field,
+        but is usually added for convenience.
+      additionalProperties:
+        type: array
+        description: Accessor identifiers which are granted the permissions described by the object key.
+        items:
+          type: string
+        uniqueItems: true
+      # `additionalProperties` is used above because with fixed fields, there were problems with device merging.
+      # E.g. leaving out the owner resulted in `null` and therefore a deletion of that permission.
+      # TODO: Find a more precise definition which avoids the problems, e.g. a nullable field with an empty array as
+      # default value or an array of objects with a permission and an accessors fields
+    TagValues:
+      type: object
+      description: An object where the keys describe tag names and the values the measured values.
+      additionalProperties:
+        $ref: "#/components/schemas/TagValue"
+      nullable: true
+    TagValue:
+      type: object
+      description: A measured value and related context information.
+      properties:
+        guid:
+          type: string
+          description: The GUID of the device this tag belongs to.
+        tagName:
+          type: string
+        oca:
+          type: integer
+          description: Optimistic control attribute used for conflict resolutions.
+          format: int64
+          nullable: true
+          default: 0
+        value:
+          nullable: true
+        timestamp:
+          type: integer
+          description: Creation timestamp
+          format: int64
+          nullable: true
+    TagValueResponses:
+      type: object
+      description: |
+        An object where the keys describe tag names and the values the state of the related tag.
+
+        This will not be persisted or serialized.
+      additionalProperties:
+        $ref: "#/components/schemas/TagValueResponse"
+      nullable: true
+    TagValueResponse:
+      type: object
+      description: The synchronisation state of a value and related context information.
+      properties:
+        guid:
+          type: string
+          description: The GUID of the device the tag belongs to.
+        state:
+          type: string
+          enum: [
+            "pending",
+            "processing",
+            "ok",
+            "error_oca",
+            "error_tag",
+            "error_write",
+            "error_tx",
+            "error_timeout",
+            "error_no_device",
+            "error_no_owner"
+          ]
+        tagName:
+          type: string
+    Device:
+      type: object
+      required:
+        - guid
+      properties:
+        owner:
+          type: string
+        lastSeen:
+          type: integer
+          description: Timestamp of last update.
+          format: int64
+          nullable: true
+        channel:
+          type: string
+        guid:
+          type: string
+        runtimeAddress:
+          type: string
+          description: The address of the runtime this device is managed by.
+          nullable: true
+        deviceModel:
+          type: array
+          description: The meta model of this device.
+          items:
+            $ref: "#/components/schemas/DeviceClass"
+          nullable: true
+        acl:
+          $ref: "#/components/schemas/DeviceAcl"
+        tagValues:
+          $ref: "#/components/schemas/TagValues"
+        failedTagValues:
+          $ref: "#/components/schemas/TagValueResponses"
+        currentAddress:
+          type: string
+          nullable: true
+    DeviceResultList:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int32
+        limit:
+          type: integer
+          format: int32
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Device"
+    DeviceEvent:
+      type: object
+      properties:
+        type:
+          type: string
+        value:
+          $ref: "#/components/schemas/Device"
+    PartialDevice:
+      type: object
+      properties:
+        owner:
+          type: string
+          nullable: true
+        tagValues:
+          $ref: "#/components/schemas/TagValues"
+        acl:
+          $ref: "#/components/schemas/DeviceAcl"
+  securitySchemes:
+    access_token:
+      type: http
+      description: "Provide a valid access token signed by Kiwigrid OAuth2 or a valid JWT signed by Kiwigrid Keycloak"
+      scheme: "bearer"
+    oauth2:
+      type: oauth2
+      description: "Requires a valid access token signed by Kiwigrid OAuth2"
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.kiwigrid.com/authorize
+          tokenUrl: https://auth.kiwigrid.com/access_token
+          scopes:
+            read_devices: "read the info about devices and device classes"
+            manage_devices: "manage devices (create, update, delete)"
+            read_channel_devices: "channel-admin (service) read all channel devices"
+            manage_channel_devices: "channel-admin (service) manage all channel devices"
+            read_all_devices: "read the info about all devices and device classes"
+            manage_all_devices: "super-admin manage all devices, including acl and tagvalues"
+            ds_read_channel_bind_device: "Check whether channel devices are bound an accessor (e.g., a user in the channel)"
+            ds_write_channel_bind_device: "Bind devices channel to an accessor (e.g., a user in the channel)"
+            ds_read_all_bind_device: "Check whether any device is bound an any accessor (e.g., a user)"
+            ds_write_all_bind_device: "Bind any device to any accessor (e.g., a user)"
+            reload_devices: "trigger device cache reloads"
+            ds_remove_user_from_acls: "Clean the ACLs for a deleted user in the device cache"
+          x-scope-default-roles:
+            read_devices: ["SUPER_ADMIN", "ADMIN", "FITTER", "SERVICE", "USER", "DEMO_USER"]
+            manage_devices: ["SUPER_ADMIN", "ADMIN", "FITTER", "USER", "DEMO_USER"]
+            read_channel_devices: ["SUPER_ADMIN", "ADMIN", "SERVICE"]
+            manage_channel_devices: ["SUPER_ADMIN", "ADMIN"]
+            read_all_devices: ["SUPER_ADMIN"]
+            manage_all_devices: [ "SUPER_ADMIN" ]
+            ds_read_channel_bind_device: ["SUPER_ADMIN", "ADMIN"]
+            ds_write_channel_bind_device: ["SUPER_ADMIN", "ADMIN"]
+            ds_read_all_bind_device: ["SUPER_ADMIN"]
+            ds_write_all_bind_device: ["SUPER_ADMIN"]
+            reload_devices: []
+            ds_remove_user_from_acls: ["SUPER_ADMIN", "ADMIN"]
+  examples:
+    GuidEqualFilterWithOwnerAscendingAndTagValueDescendingSorting:
+      value:
+        filter:
+          guid:
+            $eq: aConcreteGuid
+        sorting:
+          - owner: 1
+          - tagValues.IdName.value: -1
+    GuidEqualOneOfSeveralFilter:
+      value:
+        filter:
+          guid:
+            $in:
+              - guid1
+              - guid2
+    DeviceClassEqualFilter:
+      value:
+        filter:
+          deviceModel.deviceClass:
+            $eq: com.kiwigrid.devices.plug.Plug
+    DeviceClassEqualOneAndNotEqualAnotherFilter:
+      value:
+        filter:
+          deviceModel.deviceClass:
+            $and:
+              - deviceModel.deviceClass:
+                  $eq: com.kiwigrid.devices.inverter.Inverter
+              - deviceModel.deviceClass:
+                  $nin:
+                    - com.kiwigrid.devices.battery.Battery
+    TagNameEqualFilter:
+      value:
+        filter:
+          deviceModel.tags.tagName:
+            $eq: PowerOut
+    TagValueExistsFilter:
+      value:
+        filter:
+          tagValues.PowerOut:
+            $exists: true
+    DeviceClassEqualAndTagValueGreaterOrEqualFilter:
+      value:
+        filter:
+          deviceModel.deviceClass:
+            $eq: com.kiwigrid.devices.plug.Plug
+          tagValues.PowerElectricalIn.value:
+            $gte: 500
+    GuidAndTagValueProjection:
+      value:
+        projection:
+          guid: 1
+          deviceModel: 0
+          tagValues:
+            IdName:
+              value: 1

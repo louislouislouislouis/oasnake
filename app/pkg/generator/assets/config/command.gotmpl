@@ -1,0 +1,23 @@
+// TODO make name package configurable
+package config
+
+type CommandConfig struct {
+	RequestConfig RequestConfig
+	Extensions    Extensions
+}
+
+// The extensions are not copied, as they are shared across all commands.
+// The RequestConfig is copied to ensure that child commands do not modify the parent's state.
+func (cfg *CommandConfig) PassCommandConfigToChild() CommandConfig {
+	return CommandConfig{
+		RequestConfig: cfg.RequestConfig.copy(),
+		Extensions:    cfg.Extensions,
+	}
+}
+
+func NewCommandConfig() CommandConfig {
+	return CommandConfig{
+		RequestConfig: NewRequestConfig(),
+		Extensions:    NewExtensions(),
+	}
+}

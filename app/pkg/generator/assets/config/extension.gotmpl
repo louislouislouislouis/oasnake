@@ -1,0 +1,72 @@
+// TODO Make package name configurable
+package config
+
+import (
+	"context"
+	"net/http"
+)
+
+type Extensions struct {
+	RequestModifiers map[string][]RequestModifiers
+	Hooks            map[string][]Hook
+}
+
+func NewExtensions() Extensions {
+	return Extensions{
+		RequestModifiers: make(map[string][]RequestModifiers),
+		Hooks:            make(map[string][]Hook),
+	}
+}
+
+type Hook struct {
+	HookType
+	Fns []func() error
+}
+
+func (e *Extensions) GetRequestModifiersByKey(key string) []RequestModifiers {
+	requestModifiers := make([]RequestModifiers, 0)
+	if e.RequestModifiers == nil {
+		return requestModifiers
+	}
+	if value, exists := e.RequestModifiers["*"]; exists {
+		requestModifiers = append(requestModifiers, value...)
+	}
+
+	return append(requestModifiers, e.RequestModifiers[key]...)
+}
+
+// TODO Add godaoc comments for the Extensions struct and its methods
+func (e *Extensions) GetHooksByType(key string, hookType HookType) []func() error {
+	hooks := []func() error{}
+	if e.Hooks == nil {
+		return hooks
+	}
+	if val, exist := e.Hooks["*"]; exist && val != nil {
+		for _, hook := range val {
+			if hook.HookType == hookType {
+				hooks = append(hooks, hook.Fns...)
+			}
+		}
+	}
+	if e.Hooks[key] == nil {
+		return hooks
+	}
+	for _, hook := range e.Hooks[key] {
+		if hook.HookType == hookType {
+			hooks = append(hooks, hook.Fns...)
+		}
+	}
+	return hooks
+}
+
+// Make an enum for hook types
+type HookType int
+
+const (
+	PreRun HookType = iota
+	PersistentPreRun
+	PostRun
+	PersistentPostRun
+)
+
+type RequestModifiers func(ctx context.Context, req *http.Request) error

@@ -1,0 +1,87 @@
+// TODO: Make package name that can change
+package config
+
+import (
+	"fmt"
+	"maps"
+)
+
+type RequestConfig struct {
+	Method        string
+	Body          string
+	Url           string
+	BearerToken   string
+  Verbose       bool
+	PathParams    map[string]*string
+	QueryParams   map[string]*string
+	HeadersParams map[string]*string
+}
+
+func NewRequestConfig() RequestConfig {
+	return RequestConfig{
+		Method:        "",
+    Body:          "",
+		Url:           "",
+		BearerToken:   "",
+		PathParams:    make(map[string]*string),
+		QueryParams:   make(map[string]*string),
+		HeadersParams: make(map[string]*string),
+	}
+}
+
+func (cfg *RequestConfig) ValidateAndGetMethod() (string, error) {
+	switch cfg.Method {
+	case "GET":
+		return "GET", nil
+	case "PUT":
+		return "PUT", nil
+	case "DELETE":
+		return "DELETE", nil
+	case "POST":
+		return "POST", nil
+	case "PATCH":
+		return "PATCH", nil
+	default: return "", fmt.Errorf("not valid method")
+	}
+}
+
+func (cfg *RequestConfig) WithPathParam(key, value string) *RequestConfig {
+	cfg.PathParams[key] = &value
+	return cfg
+}
+
+func (cfg *RequestConfig) WithQueryParam(key, value string) *RequestConfig {
+	cfg.QueryParams[key] = &value
+	return cfg
+}
+
+func (cfg *RequestConfig) WithHeaderParam(key, value string) *RequestConfig {
+	cfg.HeadersParams[key] = &value
+	return cfg
+}
+
+func (cfg *RequestConfig) WithBody(body string) *RequestConfig {
+	cfg.Body = body
+	return cfg
+}
+
+// This function creates a copy of the RequestConfig for child commands
+// All map arguments are copied to ensure that child commands do not modify the parent's state
+func (cfg *RequestConfig) copy() RequestConfig {
+	childPathParam := make(map[string]*string, len(cfg.PathParams))
+	childQueryParam := make(map[string]*string, len(cfg.QueryParams))
+	childHeadersParam := make(map[string]*string, len(cfg.HeadersParams))
+	maps.Copy(childPathParam, cfg.PathParams)
+	maps.Copy(childQueryParam, cfg.QueryParams)
+	maps.Copy(childHeadersParam, cfg.HeadersParams)
+
+	return RequestConfig{
+    Method:        "",
+		Body:          cfg.Body,
+		Url:           cfg.Url,
+		BearerToken:   cfg.BearerToken,
+		PathParams:    childPathParam,
+		QueryParams:   childQueryParam,
+		HeadersParams: childHeadersParam,
+	}
+}

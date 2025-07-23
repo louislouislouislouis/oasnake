@@ -1,0 +1,116 @@
+package {{ .GetPackageName }}
+
+import (
+  "{{ .GlobalConfig.GetCommonImportPath }}"
+{{- range $method, $sub := .Children }}
+  "{{ $sub.GetImportPath}}"
+{{- end }}
+{{- if gt (len .Methods) 0 }}
+  "{{ .GlobalConfig.GetServiceImportPath }}"
+{{- end }}
+  "github.com/spf13/cobra"
+  "{{ .GlobalConfig.GetConfigImportPath }}"
+{{- if gt (len .Methods) 0 }}
+	"fmt"
+{{- end }}
+)
+
+func New{{ .GetCobraFunctionCommandName }}Cmd(cfg config.CommandConfig) *cobra.Command {
+
+  {{- if .IsParam }}
+  // Add path param to the request config
+	cfg.RequestConfig.WithPathParam("{{ .GetParamName }}", "")
+  {{- end }}
+
+  {{- range $name, $param := .GetHeaderParams }}
+  cfg.RequestConfig.WithHeaderParam("{{ $name }}", "")
+  {{- end }}
+
+  {{- range $name, $param := .GetQueryParams }}
+  cfg.RequestConfig.WithQueryParam("{{ $name }}", "")
+  {{- end }}
+
+  {{- if gt (len .Methods) 0 }}
+  // Configure Url and method
+	cfg.RequestConfig.Url = "{{ .GlobalConfig.BaseUrl }}{{ .GetPath }}"
+  {{- end }}
+
+  cmd := &cobra.Command{
+    Use:   "{{ .GetUsage }}",
+    Short: `{{ .GetShortDescription }}`,
+    Long: `{{ .GetLongDescription }}`,
+		PersistentPostRun: common.RunHooksFn("{{ .GetPath }}", config.PersistentPostRun, &cfg),
+		PersistentPreRun:  common.RunHooksFn("{{ .GetPath }}", config.PersistentPreRun, &cfg),
+		PreRun:            common.RunHooksFn("{{ .GetPath }}", config.PreRun, &cfg),
+		PostRun:           common.RunHooksFn("{{ .GetPath }}", config.PostRun, &cfg),
+    {{- if gt (len .Methods) 0 }}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			svc := service.NewHttpRequestMaker(&cfg.RequestConfig)
+			output, err := svc.MakeRequest(cfg.Extensions.GetRequestModifiersByKey("/things/{thingId}"))
+			fmt.Println(output)
+			return err
+		},
+    {{- end }}
+	}
+
+
+  {{- if not .IsRootNodeCmd }}
+    {{- if .IsParam }}
+  // Path params persistent flags
+	cmd.PersistentFlags().StringVar(cfg.RequestConfig.PathParams["{{ .GetParamName }}"], "{{ .GetParamName }}", "", "{ {{ .GetParamName }} } in path param")
+	cmd.MarkPersistentFlagRequired("{{ .GetParamName }}")
+	cmd.RegisterFlagCompletionFunc("{{ .GetParamName }}", func(cmd *cobra.Command, args []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
+		return []cobra.Completion{"{{ .GetParamName }}1", "{{ .GetParamName }}2", "{{ .GetParamName }}3"}, cobra.ShellCompDirectiveDefault
+	})
+    {{- end }}
+  {{- end }}
+
+
+  {{- if gt (len .Methods) 0 }}
+  // Method flags
+	cmd.Flags().StringVarP(&cfg.RequestConfig.Method, "method", "m", "{{ .GetDefaultMethod }}", "method of the request -- default {{ .GetDefaultMethod }}")
+
+  // Common flags
+	cmd.Flags().StringVarP(&cfg.RequestConfig.Body, "body", "b", "", "Body of the request")
+	cmd.Flags().StringVarP(&cfg.RequestConfig.BearerToken, "tokenBearer", "t", "", "Token for Bearer authentication")
+	cmd.Flags().BoolVarP(&cfg.RequestConfig.Verbose, "verbose", "v", false, "More logs for request")
+  
+  // Query parameter flags
+    {{- range $name, $param := .GetQueryParams }}
+      {{- if $name }}
+  cmd.Flags().StringVar(
+        cfg.RequestConfig.QueryParams["{{ $name }}"],
+        "queryParam-{{ $name }}",
+        "",
+        `{{ if $param.Description }}{{ $param.GetSafeDescription }}{{ else }}Header parameter '{{ $name }}'{{ end }}{{ if $param.Required }} (required){{ end }}`,
+  )
+        {{- if $param.Required }}
+  cmd.MarkFlagRequired("{{ $name }}")
+        {{- end }}
+      {{- end }}
+    {{- end }}
+
+  // Header parameter flags
+    {{- range $name, $param := .GetHeaderParams }}
+      {{- if $name }}
+  cmd.Flags().StringVar(
+        cfg.RequestConfig.HeadersParams["{{ $name }}"],
+        "headerParam-{{ $name }}",
+        "",
+        "{{ if $param.Description }}{{ $param.Description }}{{ else }}Header parameter '{{ $name }}'{{ end }}{{ if $param.Required }} (required){{ end }}",
+  )
+        {{- if $param.Required }}
+  cmd.MarkFlagRequired("{{ $name }}")
+        {{- end }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+
+
+  // Add child commands
+  {{- range .Children }}
+  cmd.AddCommand({{.GetPackageName }}.New{{ .GetCobraFunctionCommandName }}Cmd(cfg.PassCommandConfigToChild()))
+  {{- end }}
+
+	return cmd
+}

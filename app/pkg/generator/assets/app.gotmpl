@@ -1,0 +1,13 @@
+package app
+
+import (
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+)
+
+func Run(cmd *cobra.Command) error {
+	// We do not want these flags to show up in --help
+	pflag.CommandLine.MarkHidden("google-json-key")
+	pflag.CommandLine.MarkHidden("log-flush-frequency")
+	return cmd.Execute()
+}

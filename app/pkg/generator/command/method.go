@@ -1,0 +1,34 @@
+package command
+
+import (
+	"fmt"
+	"strings"
+)
+
+type Method string
+
+const (
+	GET    Method = "GET"
+	POST   Method = "POST"
+	PUT    Method = "PUT"
+	DELETE Method = "DELETE"
+	PATCH  Method = "PATCH"
+)
+
+func ParseMethod(s string) (Method, error) {
+	upper := strings.ToUpper(s)
+	switch upper {
+	case string(GET):
+		return GET, nil
+	case string(POST):
+		return POST, nil
+	case string(PUT):
+		return PUT, nil
+	case string(DELETE):
+		return DELETE, nil
+	case string(PATCH):
+		return PATCH, nil
+	default:
+		return "", fmt.Errorf("unknown method: %s", s)
+	}
+}

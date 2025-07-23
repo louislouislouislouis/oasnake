@@ -1,0 +1,145 @@
+package service
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"regexp"
+	"strings"
+	"time"
+
+  "{{ .GlobalConfig.GetConfigImportPath }}"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+)
+
+type HttpRequestMaker struct {
+	Config *config.RequestConfig
+	client *http.Client
+}
+
+func NewHttpRequestMaker(cfg *config.RequestConfig) *HttpRequestMaker {
+	if !cfg.Verbose {
+		return &HttpRequestMaker{
+			Config: cfg,
+			client: &http.Client{},
+		}
+	}
+	return &HttpRequestMaker{
+		Config: cfg,
+		client: &http.Client{
+			Transport: &LoggingRoundTripper{
+				rt:     http.DefaultTransport,
+				logger: log.Logger,
+			},
+		},
+	}
+}
+
+func (h *HttpRequestMaker) MakeRequest(modifiers []config.RequestModifiers) (string, error) {
+	url, err := resolvePathParams(h.Config.Url, h.Config.PathParams)
+	if err != nil {
+		return "", err
+	}
+
+	method, err := h.Config.ValidateAndGetMethod()
+	if err != nil {
+		return "", err
+	}
+
+	req, err := http.NewRequest(
+		method,
+		url,
+		bytes.NewBufferString(h.Config.Body),
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Param Header
+	req.Header.Set("Authorization", "Bearer "+h.Config.BearerToken)
+	for key, value := range h.Config.HeadersParams {
+		if *value != "" {
+			req.Header.Set(key, *value)
+		}
+	}
+
+	// TODO with context
+	for _, modifier := range modifiers {
+		modifier(context.Background(), req)
+	}
+
+	resp, err := h.client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	// TODO: Handle bad responses
+	if !(resp.StatusCode >= 200 && resp.StatusCode < 300) {
+		log.Debug().Msgf("Request failed with status code: %s", resp.Status)
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	return string(bodyBytes), nil
+}
+
+// 🔄 Replaces {param} placeholders in a URL with values from pathParams (map[string]*string)
+func resolvePathParams(urlTemplate string, pathParams map[string]*string) (string, error) {
+	// 🔍 Regex to find all {param} placeholders
+	re := regexp.MustCompile(`\{([^\}]+)\}`)
+
+	// 🧵 Extract all placeholders
+	matches := re.FindAllStringSubmatch(urlTemplate, -1)
+
+	for _, match := range matches {
+		key := match[1] // e.g., "userId" from "{userId}"
+		valPtr, exists := pathParams[key]
+
+		// 🚫 Missing or nil path param
+		if !exists || valPtr == nil {
+			return "", fmt.Errorf("🚨 missing path parameter: %s", key)
+		}
+
+		// 🔁 Replace the placeholder with the actual value
+		urlTemplate = strings.ReplaceAll(urlTemplate, "{"+key+"}", *valPtr)
+	}
+
+	return urlTemplate, nil
+}
+
+type LoggingRoundTripper struct {
+	rt     http.RoundTripper
+	logger zerolog.Logger
+}
+
+func (l *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	start := time.Now()
+	l.logger.Debug().Msgf("➡️ Request: %s %s", req.Method, req.URL)
+	for k, v := range req.Header {
+		for _, val := range v {
+			l.logger.Printf("%s: %s", k, val)
+		}
+	}
+
+	resp, err := l.rt.RoundTrip(req)
+	if err != nil {
+		l.logger.Debug().Msgf("❌ Error: %v", err)
+		return nil, err
+	}
+
+	l.logger.Debug().Msgf("⬅️ Response: %s - %s - Duration: %v", resp.Request.Method, resp.Status, time.Since(start))
+	for k, v := range resp.Header {
+		for _, val := range v {
+			l.logger.Debug().Msgf("%s: %s", k, val)
+		}
+	}
+
+	return resp, nil
+}
