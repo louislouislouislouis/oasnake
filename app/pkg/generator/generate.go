@@ -8,11 +8,11 @@ import (
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/louislouislouislouis/oasnake/app/pkg/config"
 	"github.com/louislouislouislouis/oasnake/app/pkg/generator/command"
 	"github.com/louislouislouislouis/oasnake/app/pkg/utils"
 	"github.com/oapi-codegen/oapi-codegen/v2/pkg/codegen"
 	"github.com/oapi-codegen/oapi-codegen/v2/pkg/util"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -28,12 +28,12 @@ const (
 
 // Generator is responsible for generating the CLI based on OpenAPI specs.
 type Generator struct {
-	cfg *config.GenerateConfig
+	Config *GeneratorConfig
 }
 
 // NewGenerator creates a new Generator instance.
-func NewGenerator(cfg config.GenerateConfig) *Generator {
-	return &Generator{cfg: &cfg}
+func NewGenerator(cfg *GeneratorConfig) *Generator {
+	return &Generator{Config: cfg}
 }
 
 // Generate executes the complete CLI generation pipeline.
@@ -49,7 +49,7 @@ func NewGenerator(cfg config.GenerateConfig) *Generator {
 //
 // Returns an error if any stage of the process fails.
 func (g *Generator) Generate() error {
-	fmt.Println("Starting CLI generation for REST API...")
+	log.Debug().Msg("Starting code generation")
 
 	// Step 1: Load the OpenAPI specification
 	swagger, opts, err := g.loadSwagger()
@@ -64,13 +64,13 @@ func (g *Generator) Generate() error {
 	}
 
 	// Step 3: Render CLI command files recursively
-	cmdOutputPath := filepath.Join(g.cfg.OutputDirectory, commandPath)
+	cmdOutputPath := filepath.Join(g.Config.OutputDirectory, commandPath)
 	if err := traverseAndRenderCommands(rootCommand, cmdOutputPath); err != nil {
 		return fmt.Errorf("failed to render command files: %w", err)
 	}
 
 	// Step 4 (Optional): Generate API models using oapi-codegen
-	if g.cfg.WithModel {
+	if g.Config.WithModel {
 		if err := g.generateModel(swagger, opts); err != nil {
 			return fmt.Errorf("failed to generate API models: %w", err)
 		}
@@ -81,7 +81,7 @@ func (g *Generator) Generate() error {
 		return fmt.Errorf("failed to generate core application templates: %w", err)
 	}
 
-	fmt.Println("Generation completed successfully in:", g.cfg.OutputDirectory)
+	log.Info().Msgf("Code generation completed successfully. Output directory: %s", g.Config.OutputDirectory)
 	return nil
 }
 
@@ -125,7 +125,7 @@ func traverseAndRenderCommands(cmd *command.NodeCmd, dir string) error {
 // based on the configuration and the provided OpenAPI document.
 //
 // Priority order:
-// 1️⃣ If a server URL is explicitly defined in the config (`cfg.ServerURL`), it is returned.
+// 1️⃣ If a server URL is explicitly defined in the config (`Config.ServerURL`), it is returned.
 // 2️⃣ Otherwise, it attempts to retrieve the base path from the OpenAPI `servers` section.
 //
 // If neither is available, an error is returned.
@@ -140,10 +140,10 @@ func traverseAndRenderCommands(cmd *command.NodeCmd, dir string) error {
 // Example error:
 //
 //	"❌ No server URL defined in the OpenAPI spec and no --server-url flag provided"
-func (generator *Generator) GetEffectiveServerUrl(doc *openapi3.T) (string, error) {
+func (g *Generator) GetEffectiveServerUrl(doc *openapi3.T) (string, error) {
 	// 1️⃣ Use the server URL from config if set
-	if generator.cfg.ServerURL != "" {
-		return generator.cfg.ServerURL, nil
+	if g.Config.ServerURL != "" {
+		return g.Config.ServerURL, nil
 	}
 
 	// 2️⃣ Attempt to extract the base path from OpenAPI spec
@@ -154,7 +154,7 @@ func (generator *Generator) GetEffectiveServerUrl(doc *openapi3.T) (string, erro
 
 	// 3️⃣ Validate that the extracted URL is meaningful
 	if url == "/" {
-		return "", fmt.Errorf("❌ no server URL defined in OpenAPI spec and no --server-url flag provided")
+		return "", fmt.Errorf("❌ First server URL not defined in OpenAPI spec and no --server-url flag provided")
 	}
 
 	// ✅ Return the resolved server URL
@@ -171,10 +171,10 @@ func (generator *Generator) GetEffectiveServerUrl(doc *openapi3.T) (string, erro
 //
 // Returns:
 //   - The effective root ne as a string.
-func (generator *Generator) GetEffectiveRootUsage(doc *openapi3.T) string {
+func (g *Generator) GetEffectiveRootUsage(doc *openapi3.T) string {
 	// Priority 1: Use the name explicitly set in the configuration
-	if generator.cfg.CommandName != "" {
-		return generator.cfg.CommandName
+	if g.Config.CommandName != "" {
+		return g.Config.CommandName
 	}
 
 	// Priority 2: Use the OpenAPI spec title as the fallback name
@@ -187,20 +187,20 @@ func (generator *Generator) GetEffectiveRootUsage(doc *openapi3.T) string {
 }
 
 // buildCommandTree parses OpenAPI paths into a hierarchical command structure.
-func (generator *Generator) toCommandTree(doc *openapi3.T) (*command.NodeCmd, error) {
-	baseUrl, err := generator.GetEffectiveServerUrl(doc)
+func (g *Generator) toCommandTree(doc *openapi3.T) (*command.NodeCmd, error) {
+	baseUrl, err := g.GetEffectiveServerUrl(doc)
 	if err != nil {
 		return nil, fmt.Errorf("error getting effective server URL: %w", err)
 	}
 	resolvePath := func(subPath string) string {
-		if generator.cfg.Installation.NeedToBeInstalled() {
+		if g.Config.ToInstall {
 			return subPath
 		}
-		return filepath.Join(generator.cfg.OutputDirectory, subPath)
+		return filepath.Join(g.Config.OutputDirectory, subPath)
 	}
 	globalConfig := command.CommandGlobalConfig{
-		RootUsage:   generator.GetEffectiveRootUsage(doc),
-		ModuleName:  generator.cfg.Module,
+		RootUsage:   g.GetEffectiveRootUsage(doc),
+		ModuleName:  g.Config.Module,
 		BaseCmdPath: resolvePath(commandPath),
 		ConfigPath:  resolvePath(configPath),
 		AppPath:     resolvePath(appPath),
@@ -245,7 +245,7 @@ func (g *Generator) generateModel(swagger *openapi3.T, opts *codegen.Configurati
 		utils.WriterConfig{
 			OutputDirectoryShouldBeEmpty: false,
 			Output: utils.FS{
-				Directory: filepath.Join(g.cfg.OutputDirectory, modelPath),
+				Directory: filepath.Join(g.Config.OutputDirectory, modelPath),
 				Filename:  modelFileName,
 			},
 			Content: generatedModel,
@@ -265,19 +265,19 @@ func (g *Generator) generateCoreApp(root *command.NodeCmd) error {
 	}
 
 	files := []fileGen{
-		{CommonCommand, filepath.Join(g.cfg.OutputDirectory, commandPath, command.CommonFolder), "utils.go"},
-		{ConfigCommand, filepath.Join(g.cfg.OutputDirectory, configPath), "command.go"},
-		{ConfigRequest, filepath.Join(g.cfg.OutputDirectory, configPath), "resuest.go"},
-		{ConfigMethod, filepath.Join(g.cfg.OutputDirectory, configPath), "method.go"},
-		{ConfigExtension, filepath.Join(g.cfg.OutputDirectory, configPath), "extension.go"},
-		{Service, filepath.Join(g.cfg.OutputDirectory, servicePath), "service.go"},
-		{App, filepath.Join(g.cfg.OutputDirectory, appPath), "app.go"},
+		{CommonCommand, filepath.Join(g.Config.OutputDirectory, commandPath, command.CommonFolder), "utils.go"},
+		{ConfigCommand, filepath.Join(g.Config.OutputDirectory, configPath), "command.go"},
+		{ConfigRequest, filepath.Join(g.Config.OutputDirectory, configPath), "resuest.go"},
+		{ConfigMethod, filepath.Join(g.Config.OutputDirectory, configPath), "method.go"},
+		{ConfigExtension, filepath.Join(g.Config.OutputDirectory, configPath), "extension.go"},
+		{Service, filepath.Join(g.Config.OutputDirectory, servicePath), "service.go"},
+		{App, filepath.Join(g.Config.OutputDirectory, appPath), "app.go"},
 	}
 
-	if g.cfg.Installation.NeedToBeInstalled() {
+	if g.Config.ToInstall {
 		files = append(files,
-			fileGen{Mod, g.cfg.OutputDirectory, "go.mod"},
-			fileGen{Main, g.cfg.OutputDirectory, "main.go"},
+			fileGen{Mod, g.Config.OutputDirectory, "go.mod"},
+			fileGen{Main, g.Config.OutputDirectory, "main.go"},
 		)
 	}
 
@@ -294,7 +294,7 @@ func (g *Generator) generateCoreApp(root *command.NodeCmd) error {
 }
 
 // This function loads the OpenAPI specification, and parse into an oapi-codegen configuration.
-func (generator *Generator) loadSwagger() (*openapi3.T, *codegen.Configuration, error) {
+func (g *Generator) loadSwagger() (*openapi3.T, *codegen.Configuration, error) {
 	opts := codegen.Configuration{
 		PackageName: "client",
 		Generate: codegen.GenerateOptions{
@@ -314,7 +314,7 @@ func (generator *Generator) loadSwagger() (*openapi3.T, *codegen.Configuration, 
 		overlayOpts.Strict = *opts.OutputOptions.Overlay.Strict
 	}
 
-	swagger, err := util.LoadSwaggerWithOverlay(generator.cfg.InputFilePath, overlayOpts)
+	swagger, err := util.LoadSwaggerWithOverlay(g.Config.InputFilePath, overlayOpts)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error loading OpenAPI spec: %w", err)
 	}

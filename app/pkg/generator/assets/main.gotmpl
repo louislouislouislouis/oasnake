@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
   "{{ .GlobalConfig.GetConfigImportPath }}"
   "{{ .GlobalConfig.GetAppImportPath }}"
@@ -9,7 +8,6 @@ import (
 )
 
 func main() {
-	log.SetOutput(os.Stdout)
 	command := cmd.New{{ .GetCobraFunctionCommandName }}Cmd(config.NewCommandConfig())
 	if err := {{ .GetAppModule }}.Run(command); err != nil {
 		os.Exit(1)
