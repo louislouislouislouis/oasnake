@@ -48,41 +48,41 @@ func NewGenerator(cfg *GeneratorConfig) *Generator {
 //  5. Creating essential core application templates.
 //
 // Returns an error if any stage of the process fails.
-func (g *Generator) Generate() error {
+func (g *Generator) Generate() (string, error) {
 	log.Debug().Msg("Starting code generation")
 
 	// Step 1: Load the OpenAPI specification
 	swagger, opts, err := g.loadSwagger()
 	if err != nil {
-		return fmt.Errorf("failed to load OpenAPI specification: %w", err)
+		return "", fmt.Errorf("failed to load OpenAPI specification: %w", err)
 	}
 
 	// Step 2: Construct the command tree from the OpenAPI paths
 	rootCommand, err := g.toCommandTree(swagger)
 	if err != nil {
-		return fmt.Errorf("failed to construct command tree: %w", err)
+		return "", fmt.Errorf("failed to construct command tree: %w", err)
 	}
 
 	// Step 3: Render CLI command files recursively
 	cmdOutputPath := filepath.Join(g.Config.OutputDirectory, commandPath)
 	if err := traverseAndRenderCommands(rootCommand, cmdOutputPath); err != nil {
-		return fmt.Errorf("failed to render command files: %w", err)
+		return "", fmt.Errorf("failed to render command files: %w", err)
 	}
 
 	// Step 4 (Optional): Generate API models using oapi-codegen
 	if g.Config.WithModel {
 		if err := g.generateModel(swagger, opts); err != nil {
-			return fmt.Errorf("failed to generate API models: %w", err)
+			return "", fmt.Errorf("failed to generate API models: %w", err)
 		}
 	}
 
 	// Step 5: Generate core application templates
 	if err := g.generateCoreApp(rootCommand); err != nil {
-		return fmt.Errorf("failed to generate core application templates: %w", err)
+		return "", fmt.Errorf("failed to generate core application templates: %w", err)
 	}
 
 	log.Info().Msgf("Code generation completed successfully. Output directory: %s", g.Config.OutputDirectory)
-	return nil
+	return g.GetEffectiveRootUsage(swagger), nil
 }
 
 // traverseAndRenderCommands recursively traverses the CLI command tree
@@ -178,7 +178,7 @@ func (g *Generator) GetEffectiveRootUsage(doc *openapi3.T) string {
 	}
 
 	// Priority 2: Use the OpenAPI spec title as the fallback name
-	rootusage := strings.TrimSpace(doc.Info.Title)
+	rootusage := utils.GoCodeString(strings.TrimSpace(doc.Info.Title))
 	if rootusage == "" {
 		return "oasnake-cli" + fmt.Sprintf("%d", rand.IntN(1000)) // Default name if no title is provided
 	}

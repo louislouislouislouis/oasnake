@@ -18,11 +18,11 @@ OASnake reads your OpenAPI (v2 or v3) specification and generates a Go-based CLI
 
 ## ✨ Features
 
--   **CLI Generation:** Transforms an OpenAPI specification into a functional CLI application.
--   **Automatic Installation:** Can automatically compile and install the generated CLI to your `GOPATH` or via Docker.
--   **Customization:** Allows customization of the command name, binary name, and more.
--   **Sub-command Handling:** Generates sub-commands for each API path, with flags for parameters.
--   **No External Dependencies:** The generated binary is self-contained and does not require `oasnake` to run.
+- **CLI Generation:** Transforms an OpenAPI specification into a functional CLI application.
+- **Automatic Installation:** Can automatically compile and install the generated CLI to your `GOPATH` or via Docker.
+- **Customization:** Allows customization of the command name, binary name, and more.
+- **Sub-command Handling:** Generates sub-commands for each API path, with flags for parameters.
+- **No External Dependencies:** The generated binary is self-contained and does not require `oasnake` to run.
 
 ## 🚀 Installation
 
@@ -71,7 +71,7 @@ oasnake generate -i <path/to/openapi.yaml> -m <your/go/module> [flags]
 
 This example generates a CLI for a test API, names it `petstore-cli`, and installs it automatically.
 
-1.  **Generate the CLI:**
+1. **Generate the CLI:**
 
     ```bash
     oasnake generate \
@@ -80,11 +80,11 @@ This example generates a CLI for a test API, names it `petstore-cli`, and instal
       -b petstore-cli
     ```
 
-2.  **Verify Installation:**
+2. **Verify Installation:**
 
     The `petstore-cli` binary is now in your `$GOPATH/bin`.
 
-3.  **Use Your New CLI:**
+3. **Use Your New CLI:**
 
     ```bash
     petstore-cli --help
@@ -95,12 +95,20 @@ This example generates a CLI for a test API, names it `petstore-cli`, and instal
 ## 🔧 How It Works
 
 OASnake parses the provided OpenAPI specification. Using a series of Go templates (`.gotmpl`), it generates:
+
 - A `Cobra` command structure.
 - `http.Client` calls for each API method.
 - Logic to handle parameters (query, header, body).
 - A `main.go` and `go.mod` to create a complete Go project.
 
 The result is a standalone Go project in the output directory, ready to be compiled.
+
+## 🗺️ Roadmap
+
+- [ ] Implementation of the compilation with `go`.
+- [ ] Autodetection of the host OS as the default value for `target-os` and `target-arch`.
+- [ ] Add online installation. Create custom image. Search for this image.
+- [ ] Propose an installation path.
 
 ## 🤝 Contributing
 

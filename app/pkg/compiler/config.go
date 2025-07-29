@@ -1,21 +1,18 @@
 package compiler
 
 type CompilerConfig struct {
+	OutputDirectory   string
 	BinaryName        string
-	InstallWithGo     bool
-	InstallWithDocker bool
+	CompileWithGo     bool
+	CompileWithDocker bool
+	TargetOs          string
+	TargetArch        string
 }
 
 func NewCompilerConfig() *CompilerConfig {
 	return &CompilerConfig{}
 }
 
-type InstallationConfig struct {
-	BinaryName        string
-	InstallWithGo     bool
-	InstallWithDocker bool
-}
-
-func (cfg *CompilerConfig) NeedToBeInstalled() bool {
-	return (cfg.BinaryName != "" || cfg.InstallWithGo || cfg.InstallWithDocker)
+func (cfg *CompilerConfig) NeedToBeCompiled() bool {
+	return (cfg.BinaryName != "" || cfg.CompileWithGo || cfg.CompileWithDocker)
 }

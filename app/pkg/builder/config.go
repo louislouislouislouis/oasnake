@@ -8,11 +8,13 @@ import (
 type BuiderConfig struct {
 	GeneratorConfig *generator.GeneratorConfig
 	CompilerConfig  *compiler.CompilerConfig
+	OutputDirectory string
 }
 
 func NewBuilderConfig() *BuiderConfig {
 	return &BuiderConfig{
 		generator.NewGeneratorConfig(),
 		compiler.NewCompilerConfig(),
+		"",
 	}
 }

@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug oapi-codegen (main.go) main",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}/main.go",
+      "args": [
+        "generate",
+        "-i",
+        "things-api.yaml",
+        "-m",
+        "github.com/louis"
+      ],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
