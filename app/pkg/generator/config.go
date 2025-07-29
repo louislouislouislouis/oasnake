@@ -1,13 +1,13 @@
 package generator
 
 type GeneratorConfig struct {
-	ServerURL       string
-	InputFilePath   string
-	OutputDirectory string
-	Module          string
-	CommandName     string
-	WithModel       bool
-	ToInstall       bool
+	ServerURL        string
+	InputFilePath    string
+	OutputDirectory  string
+	Module           string
+	CommandName      string
+	WithModel        bool
+	WithCompilerFile bool
 }
 
 func NewGeneratorConfig() *GeneratorConfig {

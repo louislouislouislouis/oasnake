@@ -105,9 +105,11 @@ The result is a standalone Go project in the output directory, ready to be compi
 
 ## 🗺️ Roadmap
 
-- [ ] Implementation of the compilation with `go`.
+- [ ] Add default value for compilation (go).
+- [ ] Make parsing of spec an independent spec as the code generation.
+- [ ] Better management of stdOut and stdErr for output of compilation.
 - [ ] Autodetection of the host OS as the default value for `target-os` and `target-arch`.
-- [ ] Add online installation. Create custom image. Search for this image.
+- [ ] Add offline installation. Create custom image. Search for this image.
 - [ ] Propose an installation path.
 
 ## 🤝 Contributing

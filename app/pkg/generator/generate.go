@@ -193,7 +193,7 @@ func (g *Generator) toCommandTree(doc *openapi3.T) (*command.NodeCmd, error) {
 		return nil, fmt.Errorf("error getting effective server URL: %w", err)
 	}
 	resolvePath := func(subPath string) string {
-		if g.Config.ToInstall {
+		if g.Config.WithCompilerFile {
 			return subPath
 		}
 		return filepath.Join(g.Config.OutputDirectory, subPath)
@@ -274,7 +274,7 @@ func (g *Generator) generateCoreApp(root *command.NodeCmd) error {
 		{App, filepath.Join(g.Config.OutputDirectory, appPath), "app.go"},
 	}
 
-	if g.Config.ToInstall {
+	if g.Config.WithCompilerFile {
 		files = append(files,
 			fileGen{Mod, g.Config.OutputDirectory, "go.mod"},
 			fileGen{Main, g.Config.OutputDirectory, "main.go"},

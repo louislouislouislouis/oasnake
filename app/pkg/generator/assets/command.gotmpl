@@ -46,7 +46,7 @@ func New{{ .GetCobraFunctionCommandName }}Cmd(cfg config.CommandConfig) *cobra.C
     {{- if gt (len .Methods) 0 }}
 		RunE: func(cmd *cobra.Command, args []string) error {
 			svc := service.NewHttpRequestMaker(&cfg.RequestConfig)
-			output, err := svc.MakeRequest(cfg.Extensions.GetRequestModifiersByKey("/things/{thingId}"))
+			output, err := svc.MakeRequest(cfg.Extensions.GetRequestModifiersByKey("{{ .GetPath }}"))
 			fmt.Println(output)
 			return err
 		},

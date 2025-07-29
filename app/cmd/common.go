@@ -5,5 +5,5 @@ import (
 )
 
 func handleError(err error) {
-	log.Error().Err(err).Msg("An error occurred")
+	log.Debug().Err(err).Msg("An error occurred")
 }

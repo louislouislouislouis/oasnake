@@ -13,6 +13,9 @@ func NewCompilerConfig() *CompilerConfig {
 	return &CompilerConfig{}
 }
 
-func (cfg *CompilerConfig) NeedToBeCompiled() bool {
-	return (cfg.BinaryName != "" || cfg.CompileWithGo || cfg.CompileWithDocker)
-}
+type CompilerType int
+
+const (
+	DockerCompilerType CompilerType = iota
+	GoCompilerType
+)

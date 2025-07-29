@@ -11,6 +11,10 @@ type BuiderConfig struct {
 	OutputDirectory string
 }
 
+func (cfg *BuiderConfig) NeedToCompile() bool {
+	return (cfg.CompilerConfig.CompileWithGo || cfg.CompilerConfig.CompileWithDocker)
+}
+
 func NewBuilderConfig() *BuiderConfig {
 	return &BuiderConfig{
 		generator.NewGeneratorConfig(),
