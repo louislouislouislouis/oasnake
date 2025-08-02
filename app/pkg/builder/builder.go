@@ -31,10 +31,6 @@ func NewBuilder(cfg *BuiderConfig) *Builder {
 }
 
 func (b *Builder) validateAndPrepareConfig() error {
-	if b.compiler != nil {
-		return fmt.Errorf("compiler is not set")
-	}
-
 	// Sanitize Generator Config
 	b.generator.Config.WithCompilerFile = b.config.NeedToCompile()
 	b.generator.Config.OutputDirectory = b.config.OutputDirectory
