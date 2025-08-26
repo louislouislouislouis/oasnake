@@ -3,10 +3,12 @@ package command
 import (
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/louislouislouislouis/oasnake/app/pkg/utils"
+	"github.com/rs/zerolog/log"
 )
 
 type CommandGlobalConfig struct {
@@ -169,19 +171,45 @@ func (node *NodeCmd) GetParamName() string {
 }
 
 func (node *NodeCmd) GetPackageName() string {
+	var name string
+
 	if node.IsRootNodeCmd() {
-		last := path.Base(node.GlobalConfig.BaseCmdPath)
-		return last
+		return path.Base(node.GlobalConfig.BaseCmdPath)
+	} else if node.IsParam() {
+		name = strings.Trim(node.segment, "{}")
+	} else {
+		name = node.segment
 	}
-	if node.IsParam() {
-		return strings.ToLower(strings.Trim(node.segment, "{}"))
+
+	name = strings.ToLower(name)
+	name = strings.ReplaceAll(name, "-", "_")
+
+	if name == "" {
+		log.Error().Msg("Package name is empty, defaulting to 'cmd'")
 	}
-	return strings.ToLower(node.segment)
+
+	// Check reserved keyword
+	if slices.Contains(reservedPackageNames, name) {
+		name = name + "_cmd"
+	}
+
+	return name
+}
+
+var reservedPackageNames = []string{
+	"break", "default", "func", "interface", "select",
+	"case", "defer", "go", "map", "struct",
+	"chan", "else", "goto", "package", "switch",
+	"const", "fallthrough", "if", "range", "type",
+	"continue", "for", "import", "return", "var",
+	"init",
+	// Custom
+	"main", "cmd", "config",
 }
 
 func (node *NodeCmd) GetUsage() string {
 	if node.IsRootNodeCmd() {
-		return utils.GoCodeString(node.GlobalConfig.RootUsage)
+		return node.GlobalConfig.RootUsage
 	}
 	if node.IsParam() {
 		return "<" + strings.Trim(node.segment, "{}") + ">"

@@ -3,24 +3,44 @@ package config
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+
+	"github.com/spf13/cobra"
 )
 
 type Extensions struct {
 	RequestModifiers map[string][]RequestModifiers
 	Hooks            map[string][]Hook
+	Completion       map[string]CompletionFn
 }
+
+type CompletionFn func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective)
 
 func NewExtensions() Extensions {
 	return Extensions{
 		RequestModifiers: make(map[string][]RequestModifiers),
 		Hooks:            make(map[string][]Hook),
+		Completion:       make(map[string]CompletionFn),
 	}
 }
 
 type Hook struct {
 	HookType
 	Fns []func() error
+}
+
+func (e *Extensions) GetCompletionFnByKey(key string) CompletionFn {
+	if e.Completion[key] == nil {
+		return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			return []cobra.Completion{
+				fmt.Sprintf("%s1", key),
+				fmt.Sprintf("%s2", key),
+				fmt.Sprintf("%s3", key),
+			}, cobra.ShellCompDirectiveDefault
+		}
+	}
+	return e.Completion[key]
 }
 
 func (e *Extensions) GetRequestModifiersByKey(key string) []RequestModifiers {

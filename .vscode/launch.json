@@ -10,7 +10,7 @@
       "args": [
         "generate",
         "-i",
-        "things-api.yaml",
+        "ghes-3.14.yaml",
         "-m",
         "github.com/louis"
       ],

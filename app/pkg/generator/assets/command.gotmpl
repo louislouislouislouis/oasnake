@@ -59,9 +59,7 @@ func New{{ .GetCobraFunctionCommandName }}Cmd(cfg config.CommandConfig) *cobra.C
   // Path params persistent flags
 	cmd.PersistentFlags().StringVar(cfg.RequestConfig.PathParams["{{ .GetParamName }}"], "{{ .GetParamName }}", "", "{ {{ .GetParamName }} } in path param")
 	cmd.MarkPersistentFlagRequired("{{ .GetParamName }}")
-	cmd.RegisterFlagCompletionFunc("{{ .GetParamName }}", func(cmd *cobra.Command, args []string, toComplete string) ([]cobra.Completion, cobra.ShellCompDirective) {
-		return []cobra.Completion{"{{ .GetParamName }}1", "{{ .GetParamName }}2", "{{ .GetParamName }}3"}, cobra.ShellCompDirectiveDefault
-	})
+	cmd.RegisterFlagCompletionFunc("{{ .GetParamName }}", cfg.Extensions.GetCompletionFnByKey("{{ .GetParamName }}"))
     {{- end }}
   {{- end }}
 

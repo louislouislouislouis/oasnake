@@ -161,6 +161,8 @@ func (g *Generator) GetEffectiveServerUrl(doc *openapi3.T) (string, error) {
 	return url, nil
 }
 
+// TODO: verify usage string rules for string -> no space ?
+//
 // GetEffectiveRootUsage determines the CLI binary name to use for generation.
 //
 // Priority is given to the explicit value set in the configuration. If not set,
@@ -212,7 +214,12 @@ func (g *Generator) toCommandTree(doc *openapi3.T) (*command.NodeCmd, error) {
 		segments := strings.Split(strings.Trim(path, "/"), "/")
 		current := rootNode
 
+	segmentLoop:
 		for _, segment := range segments {
+			if segment == "" {
+				log.Debug().Msg("Add Root Segment")
+				break segmentLoop
+			}
 			if _, exists := current.Children[segment]; !exists {
 				current.Children[segment] = current.NewChildrenNodeCmd(segment)
 			}

@@ -1,4 +1,3 @@
-
 /* Package common contains utilities and common functions used across different commands. */
 package common
 
@@ -20,4 +19,8 @@ func RunHooksFn(prefix string, hookType config.HookType, cfg *config.CommandConf
 			parent.PersistentPostRun(parent, args)
 		}
 	}
+}
+
+func GetCompletionFn(id string, cfg *config.CommandConfig) func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	return cfg.Extensions.GetCompletionFnByKey(id)
 }

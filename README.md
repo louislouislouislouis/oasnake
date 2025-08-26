@@ -5,7 +5,8 @@
 
 Generate a complete, standalone CLI client for any REST API from an OpenAPI specification.
 
-OASnake reads your OpenAPI (v2 or v3) specification and generates a Cobra-based CLI client, ready to be compiled and used.
+OASnake reads your OpenAPI (v2 or v3) specification and
+generates a Cobra-based CLI client, ready to be compiled and used.
 
 ## ✨ Features
 
@@ -20,7 +21,7 @@ OASnake reads your OpenAPI (v2 or v3) specification and generates a Cobra-based 
 
 There are two ways to install `oasnake`.
 
-### With Docker
+### Install with Docker
 
 If you don't have a Go environment set up, you can build a Docker image.
 
@@ -28,7 +29,7 @@ If you don't have a Go environment set up, you can build a Docker image.
 docker build -t oasnake:0.0.1 .
 ```
 
-### With Go
+### Install with Go
 
 To install `oasnake` directly, use `go install`:
 
@@ -40,64 +41,139 @@ Make sure your `$GOPATH/bin` environment variable is in your `PATH`.
 
 ## 🛠️ Usage
 
-The main command is `generate`. It takes an OpenAPI specification file and generates the source code for a CLI client.
+The main command is `generate`.
+It takes an OpenAPI specification file and generates the source code for a CLI client.
 
-If you are using the Docker image, the command will be slightly different. This command mounts your current working directory to `/app` inside the container, so you should adjust the `--input` and `--output` paths accordingly.
-
-**Docker:**
+### Run with Docker
 
 ```bash
-docker run -it --rm -v "$(pwd):/app" oasnake:0.0.1 generate --input /app/oas-spec.yaml --output /app/out --module github.com/myusername/myrepo
+docker run -it --rm \
+-v "$(pwd):/app" oasnake:0.0.1 generate \
+--input /app/oas-spec.yaml \
+--output /app/out \
+--module github.com/myusername/myrepo
 ```
 
-**With Go:**
+### Run with Go
 
 ```bash
-oasnake generate -i <path/to/openapi.yaml> -m <your/go/module> [flags]
+oasnake generate \
+--input <path/to/openapi.yaml> \
+--module <your/go/module> [flags]
 ```
 
 For a full list of available flags and their descriptions, please refer to the [documentation](doc/oasnake.md).
 
-## 📝 Full Example
+## 📝 Example: Generating a GitHub CLI
 
-This example generates a CLI for a test API, names it `petstore-cli`, and installs it automatically.
+This example demonstrates how to generate a command-line interface
+for the GitHub API.
+The resulting CLI will be named `github-cli` and will be compiled and ready to use.
 
-1. **Generate the CLI:**
+> You need Go installed on your machine to compile the generated code.
 
-    ```bash
-    oasnake generate \
-      -i petstore-api.yaml \
-      -m github.com/my-org/petstore-cli \
-      -b petstore-cli
-    ```
+### 1. Download the OpenAPI Specification
 
-2. **Verify Installation:**
+First, download the OpenAPI specification for the GitHub API.
+This example uses the specification for GitHub Enterprise Server 3.14.
 
-    The `petstore-cli` binary is now in your folder.
+```bash
+curl -L -o ghes-3.14.yaml \
+  https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/ghes-3.14/ghes-3.14.yaml
+```
 
-3. **Use Your New CLI:**
+### 2. Generate and Compile the CLI
 
-    ```bash
-    petstore-cli --help
-    petstore-cli list-pets
-    petstore-cli create-pet --name "My new pet"
-    ```
+Next, use `oasnake` to generate the Go source code and compile it into a binary.
+This example targets macOS on an ARM64 architecture,
+but you can adjust the `--target-os` and `--target-arch` flags as needed.
+
+The `--server-url` is set to `https://api.github.com` to ensure
+the generated CLI communicates with the public GitHub API.
+
+```bash
+oasnake generate \
+  --input ghes-3.14.yaml \
+  --output github-cli \
+  --module github.com/example/github-cli \
+  --name github-cli \
+  --compile-with-go \
+  --target-os darwin \
+  --target-arch arm64 \
+  --server-url https://api.github.com
+```
+
+This command creates a new directory named `github-cli` containing
+the generated Go project and the compiled binary.
+
+### 3. Using Your New CLI
+
+You can now use your newly generated CLI to interact with the GitHub API.
+
+First, navigate into the output directory:
+
+```bash
+cd github-cli
+```
+
+To enable command-line completion for `zsh` (or your preferred shell), run:
+
+```bash
+source <(./github-cli completion zsh)
+```
+
+You can now explore the available commands:
+
+```bash
+./github-cli --help
+```
+
+To see the subcommands for a specific resource, like `repos`, you can also use `--help`:
+
+```bash
+./github-cli repos --help
+```
+
+#### Example: Listing Repository Information
+
+To fetch information about a specific repository, you can use the `repos get` command.
+This example retrieves details for the `oasnake` repository, owned by `louislouislouislouis`.
+
+A GitHub Personal Access Token (PAT) is required for authentication.
+
+```bash
+./github-cli repos get \
+  --owner louislouislouislouis \
+  --repo oasnake \
+  --tokenBearer "YOUR_GITHUB_PAT"
+```
+
+For a more readable output, you can pipe the JSON response to `jq`:
+
+```bash
+./github-cli repos get \
+  --owner louislouislouislouis \
+  --repo oasnake \
+  --tokenBearer "YOUR_GITHUB_PAT" | jq .
+```
 
 ## 🔧 How It Works
 
-OASnake parses the provided OpenAPI specification. Using a series of Go templates (`.gotmpl`), it generates:
+OASnake parses the provided OpenAPI specification.
+Using a series of Go templates (`.gotmpl`), it generates:
 
 - A `Cobra` command structure.
 - `http.Client` calls for each API method.
 - Logic to handle parameters (query, header, body).
-- A `main.go` and `go.mod` to create a complete Go project.
+- A `main.go` and `go.mod` to create a complete Go project. (optional)
 
 The result is a standalone Go project in the output directory, ready to be compiled.
 
 ## 🗺️ Roadmap
 
+- [ ] Add usage for reserved keyword
+- [ ] Make parsing of spec an independent spec as the code generation + better state machine for builder.
 - [ ] Add default value for compilation (go).
-- [ ] Make parsing of spec an independent spec as the code generation.
 - [ ] Better management of stdOut and stdErr for output of compilation.
 - [ ] Autodetection of the host OS as the default value for `target-os` and `target-arch`.
 - [ ] Add offline installation. Create custom image. Search for this image.
