@@ -1,36 +1,81 @@
+/* Package builder handle the builder for generating code */
 package builder
 
 import (
 	"fmt"
 
+	"github.com/louislouislouislouis/oasnake/app/pkg/builder/internal/state"
+	"github.com/louislouislouislouis/oasnake/app/pkg/builder/internal/state/events"
 	"github.com/louislouislouislouis/oasnake/app/pkg/compiler"
 	"github.com/louislouislouislouis/oasnake/app/pkg/generator"
+	"github.com/rs/zerolog/log"
 )
 
 type Builder struct {
 	generator *generator.Generator
 	compiler  compiler.Compiler
 	config    *BuiderConfig
+	sm        *state.StateManager
 }
 
-func NewBuilder(cfg *BuiderConfig) *Builder {
+func NewBuilder(cfg *BuiderConfig) (*Builder, error) {
 	var c compiler.Compiler
+	var err error
+
 	if cfg.NeedToCompile() {
-		if cfg.CompilerConfig.CompileWithDocker {
-			c, _ = compiler.NewCompiler(compiler.DockerCompilerType, cfg.CompilerConfig)
-		}
-		if cfg.CompilerConfig.CompileWithGo {
-			c, _ = compiler.NewCompiler(compiler.GoCompilerType, cfg.CompilerConfig)
-		}
+		c, err = cfg.GetCompiler()
 	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	generator := generator.NewGenerator(cfg.GeneratorConfig)
+
 	return &Builder{
-		generator: generator.NewGenerator(cfg.GeneratorConfig),
+		generator: generator,
 		compiler:  c,
 		config:    cfg,
-	}
+		sm: state.NewStateManager(
+			map[state.State]state.StateFunc{
+				state.Generating: func(event events.Event) events.Event {
+					rootUsage, err := generator.Generate()
+					if err != nil {
+						return events.ErrorEvent{Error: err}
+					}
+					return events.FinishGenerateCodeEvent{
+						RootUsage: rootUsage,
+					}
+				},
+				state.WithCode: func(event events.Event) events.Event {
+					rootUsage := event.(events.FinishGenerateCodeEvent).RootUsage
+					log.Debug().Msgf("code is now generated with root usage: %s", rootUsage)
+					if cfg.NeedToCompile() {
+						return events.StartCompileEvent{RootUsage: rootUsage}
+					}
+					return events.SuccessEvent{}
+				},
+				state.Compiling: func(event events.Event) events.Event {
+					rootUsage := event.(events.StartCompileEvent).RootUsage
+					c.GetConfig().BinaryName = rootUsage
+					err := c.Compile()
+					if err != nil {
+						return events.ErrorEvent{Error: err}
+					}
+					return events.FinishCompileEvent{}
+				},
+				state.WithBinary: func(event events.Event) events.Event {
+					if cfg.NeedToInstall() {
+						return events.StartInstallEvent{}
+					}
+					return events.SuccessEvent{}
+				},
+			},
+		),
+	}, nil
 }
 
-func (b *Builder) validateAndPrepareConfig() error {
+func (b *Builder) validateAndSanitizeConfig() error {
 	// Sanitize Generator Config
 	b.generator.Config.WithCompilerFile = b.config.NeedToCompile()
 	b.generator.Config.OutputDirectory = b.config.OutputDirectory
@@ -55,20 +100,14 @@ func (b *Builder) validateAndPrepareConfig() error {
 }
 
 func (b *Builder) Build() error {
-	err := b.validateAndPrepareConfig()
-	if err != nil {
+	if err := b.validateAndSanitizeConfig(); err != nil {
 		return err
 	}
-	rootUsage, err := b.generator.Generate()
-	if err != nil {
-		return err
-	}
+	return b.start()
+}
 
-	// The binary name is a result of the rootUsage Compilation
-	if b.config.NeedToCompile() {
-		b.compiler.GetConfig().BinaryName = rootUsage
-		return b.compiler.Compile()
-	}
-
-	return nil
+func (b *Builder) start() error {
+	return b.sm.Accept(
+		events.StartGenerateEvent{Filename: b.generator.Config.InputFilePath},
+	)
 }

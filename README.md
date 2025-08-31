@@ -171,13 +171,13 @@ The result is a standalone Go project in the output directory, ready to be compi
 
 ## 🗺️ Roadmap
 
+- [ ] Make parsing of spec an independent spec as the code generation. (Step 1&2 in a parser)
 - [ ] Add usage for reserved keyword
-- [ ] Make parsing of spec an independent spec as the code generation + better state machine for builder.
 - [ ] Add default value for compilation (go).
 - [ ] Better management of stdOut and stdErr for output of compilation.
 - [ ] Autodetection of the host OS as the default value for `target-os` and `target-arch`.
-- [ ] Add offline installation. Create custom image. Search for this image.
-- [ ] Propose an installation path.
+- [ ] Docker compilation : create custom image. Search for this image. Create if not. Use after.
+- [ ] Add installation option.
 
 ## 🤝 Contributing
 

@@ -11,8 +11,12 @@ func NewGenerateCommand() *cobra.Command {
 		Use:   "generate",
 		Short: "Generate a binary terminal CLI for REST",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			myBuilder := builder.NewBuilder(builderCfg)
-			err := myBuilder.Build()
+			myBuilder, err := builder.NewBuilder(builderCfg)
+			if err != nil {
+				handleError(err)
+				return err
+			}
+			err = myBuilder.Build()
 			if err != nil {
 				handleError(err)
 			}
@@ -32,7 +36,7 @@ func NewGenerateCommand() *cobra.Command {
 	cmd.PersistentFlags().StringVarP(&builderCfg.OutputDirectory, "output", "o", "out", "output directory for generated code - defaults to 'out' in the current directory.")
 	cmd.PersistentFlags().StringVarP(&builderCfg.GeneratorConfig.CommandName, "name", "n", "", "The root command name (and usage), if not provided, it will be set to the info name from the OpenAPI spec. If it is not find, it will be a random name")
 
-	// Complitation flags
+	// Compiler flags
 	cmd.PersistentFlags().BoolVar(&builderCfg.CompilerConfig.CompileWithGo, "compile-with-go", false, "create binary using go compiler. This will only work if you have go installed and in your PATH.")
 	cmd.PersistentFlags().BoolVar(&builderCfg.CompilerConfig.CompileWithDocker, "compile-with-docker", false, "create binary using docker. This will only work if you have docker installed and in your PATH.")
 	cmd.MarkFlagsMutuallyExclusive("compile-with-go", "compile-with-docker")
