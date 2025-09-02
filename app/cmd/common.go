@@ -1,7 +1,9 @@
 package cmd
 
-import "fmt"
+import (
+	"github.com/rs/zerolog/log"
+)
 
 func handleError(err error) {
-	fmt.Println("Error:", err)
+	log.Error().Err(err).Msg("An error occurred")
 }
