@@ -8,14 +8,25 @@ import (
 	"github.com/louislouislouislouis/oasnake/app/pkg/builder/internal/state/events"
 	"github.com/louislouislouislouis/oasnake/app/pkg/compiler"
 	"github.com/louislouislouislouis/oasnake/app/pkg/generator"
+	"github.com/louislouislouislouis/oasnake/app/pkg/parser"
+	"github.com/oapi-codegen/oapi-codegen/v2/pkg/codegen"
 	"github.com/rs/zerolog/log"
 )
 
 type Builder struct {
 	generator *generator.Generator
 	compiler  compiler.Compiler
+	parser    *parser.Parser
 	config    *BuiderConfig
 	sm        *state.StateManager
+}
+
+var parserCodeGenConf = &codegen.Configuration{
+	PackageName: "client",
+	Generate: codegen.GenerateOptions{
+		Client: true,
+		Models: true,
+	},
 }
 
 func NewBuilder(cfg *BuiderConfig) (*Builder, error) {
@@ -31,15 +42,28 @@ func NewBuilder(cfg *BuiderConfig) (*Builder, error) {
 	}
 
 	generator := generator.NewGenerator(cfg.GeneratorConfig)
+	parser := parser.NewParser(*cfg.ParserConfig)
 
 	return &Builder{
 		generator: generator,
 		compiler:  c,
 		config:    cfg,
+		parser:    parser,
 		sm: state.NewStateManager(
 			map[state.State]state.StateFunc{
+				state.Parsing: func(event events.Event) events.Event {
+					rootCmd, spec, err := parser.ParseAndGetOpts()
+					if err != nil {
+						return events.ErrorEvent{Error: err}
+					}
+					return events.FinishParsingEvent{
+						RootCmd: rootCmd,
+						Spec:    spec,
+					}
+				},
 				state.Generating: func(event events.Event) events.Event {
-					rootUsage, err := generator.Generate()
+					finishParsingEvent := event.(events.FinishParsingEvent)
+					rootUsage, err := generator.Generate(finishParsingEvent.RootCmd, finishParsingEvent.Spec)
 					if err != nil {
 						return events.ErrorEvent{Error: err}
 					}
@@ -108,6 +132,6 @@ func (b *Builder) Build() error {
 
 func (b *Builder) start() error {
 	return b.sm.Accept(
-		events.StartGenerateEvent{Filename: b.generator.Config.InputFilePath},
+		events.StartParsingEvent{},
 	)
 }

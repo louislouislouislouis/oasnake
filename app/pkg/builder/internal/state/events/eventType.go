@@ -5,8 +5,8 @@ import "fmt"
 type EventType int
 
 const (
-	Compile EventType = iota
-	Stop
+	StartParsing EventType = iota
+	FinishParsing
 	StartGenerateCode
 	FinishGenerateCode
 	End
@@ -20,10 +20,10 @@ const (
 // String returns the string representation of the EventType
 func (e EventType) String() string {
 	switch e {
-	case Compile:
-		return "Compile"
-	case Stop:
-		return "Stop"
+	case StartParsing:
+		return "StartParsing"
+	case FinishParsing:
+		return "FinishParsing"
 	case StartGenerateCode:
 		return "StartGenerateCode"
 	case FinishGenerateCode:

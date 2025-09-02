@@ -20,17 +20,19 @@ func NewGenerateCommand() *cobra.Command {
 			if err != nil {
 				handleError(err)
 			}
-			return err
+			return nil
 		},
 	}
 
-	// Required Flags
-	cmd.PersistentFlags().StringVarP(&builderCfg.GeneratorConfig.InputFilePath, "input", "i", "", "the input OpenAPI file path")
+	// Parser Required Flags
+	cmd.PersistentFlags().StringVarP(&builderCfg.ParserConfig.InputFilePath, "input", "i", "", "the input OpenAPI file path")
 	cmd.MarkPersistentFlagRequired("input")
+
+	// Generator required flags
 	cmd.PersistentFlags().StringVarP(&builderCfg.GeneratorConfig.Module, "module", "m", "", "The module name for the generated code")
 	cmd.MarkPersistentFlagRequired("module")
 
-	// Optional Flags
+	// Generator Optional Flags
 	cmd.PersistentFlags().StringVar(&builderCfg.GeneratorConfig.ServerURL, "server-url", "", "Url of the server to use in the generated code, if not provided, it will be set to the server URL from the OpenAPI spec")
 	cmd.PersistentFlags().BoolVar(&builderCfg.GeneratorConfig.WithModel, "with-model", false, "generate a model for the OpenAPI spec, this will generate a model in the output directory with the same name as the OpenAPI spec file, but with a .go extension. This is useful if you want to use the generated code in your own project.")
 	cmd.PersistentFlags().StringVarP(&builderCfg.OutputDirectory, "output", "o", "out", "output directory for generated code - defaults to 'out' in the current directory.")

@@ -235,7 +235,7 @@ func (node *NodeCmd) IsRootNodeCmd() bool {
 }
 
 func (node *NodeCmd) NewChildrenNodeCmd(segment string) *NodeCmd {
-	childNodeCmd := newNodeCmd(node.GlobalConfig, segment)
+	childNodeCmd := newNodeCmd(segment)
 	childNodeCmd.depth = node.depth + 1
 	childNodeCmd.Parent = node
 	childNodeCmd.RelativePath = node.RelativePath + childNodeCmd.GetPackageName() + "/"
@@ -246,20 +246,26 @@ func (node *NodeCmd) IsParam() bool {
 	return strings.HasPrefix(node.segment, "{") && strings.HasSuffix(node.segment, "}")
 }
 
-func newNodeCmd(GlobalConfig CommandGlobalConfig, segment string) *NodeCmd {
+func newNodeCmd(segment string) *NodeCmd {
 	return &NodeCmd{
-		GlobalConfig: GlobalConfig,
-		depth:        0,
-		paramDepth:   0,
-		Parent:       nil,
-		segment:      segment,
-		Methods:      make(map[Method]*openapi3.Operation),
-		Children:     make(map[string]*NodeCmd),
+		depth:      0,
+		paramDepth: 0,
+		Parent:     nil,
+		segment:    segment,
+		Methods:    make(map[Method]*openapi3.Operation),
+		Children:   make(map[string]*NodeCmd),
 	}
 }
 
-func NewRootNodeCmd(config CommandGlobalConfig) *NodeCmd {
-	node := newNodeCmd(config, "")
+func NewRootNodeCmd() *NodeCmd {
+	node := newNodeCmd("")
 	node.RelativePath = "/"
 	return node
+}
+
+func (node *NodeCmd) SetGlobalConfig(config CommandGlobalConfig) {
+	node.GlobalConfig = config
+	for _, child := range node.Children {
+		child.SetGlobalConfig(config)
+	}
 }

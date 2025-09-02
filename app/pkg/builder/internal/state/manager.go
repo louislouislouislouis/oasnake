@@ -19,7 +19,10 @@ func NewStateManager(stateFuncs map[State]StateFunc) *StateManager {
 		stateFunctions: stateFuncs,
 		transitions: map[State]map[events.EventType]State{
 			Ready: {
-				events.StartGenerateCode: Generating,
+				events.StartParsing: Parsing,
+			},
+			Parsing: {
+				events.FinishParsing: Generating,
 			},
 			Generating: {
 				events.FinishGenerateCode: WithCode,
@@ -62,13 +65,14 @@ func (sm *StateManager) Accept(event events.Event) error {
 
 	log.Debug().Msgf("transitioning to %s", next.String())
 	sm.current = next
+	log.Info().Msgf("%s", sm.current.String())
 	handler, exists := sm.stateFunctions[sm.current]
 	if !exists {
 		log.Debug().Msgf("No state function for state %s", sm.current.String())
 	}
 	if exists {
 		log.Debug().Msgf("State function of state %s will be launched after receiving event %s", sm.current.String(), event.Type().String())
-		sm.Accept(handler(event))
+		return sm.Accept(handler(event))
 	}
 	return nil
 }

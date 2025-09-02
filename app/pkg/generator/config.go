@@ -1,22 +1,25 @@
 package generator
 
+import "github.com/oapi-codegen/oapi-codegen/v2/pkg/codegen"
+
 type GeneratorConfig struct {
 	ServerURL        string
-	InputFilePath    string
 	OutputDirectory  string
 	Module           string
 	CommandName      string
 	WithModel        bool
 	WithCompilerFile bool
+
+	parserCodeGenConf *codegen.Configuration
 }
 
-func NewGeneratorConfig() *GeneratorConfig {
+func NewGeneratorConfig(parserCodeGenConf *codegen.Configuration) *GeneratorConfig {
 	return &GeneratorConfig{
-		ServerURL:       "",
-		InputFilePath:   "",
-		OutputDirectory: "out",
-		Module:          "",
-		CommandName:     "",
-		WithModel:       false,
+		ServerURL:         "",
+		OutputDirectory:   "out",
+		Module:            "",
+		CommandName:       "",
+		WithModel:         false,
+		parserCodeGenConf: parserCodeGenConf,
 	}
 }

@@ -5,11 +5,13 @@ import (
 
 	"github.com/louislouislouislouis/oasnake/app/pkg/compiler"
 	"github.com/louislouislouislouis/oasnake/app/pkg/generator"
+	"github.com/louislouislouislouis/oasnake/app/pkg/parser"
 )
 
 type BuiderConfig struct {
 	GeneratorConfig *generator.GeneratorConfig
 	CompilerConfig  *compiler.CompilerConfig
+	ParserConfig    *parser.Config
 	OutputDirectory string
 }
 
@@ -34,8 +36,11 @@ func (cfg *BuiderConfig) GetCompiler() (compiler.Compiler, error) {
 
 func NewBuilderConfig() *BuiderConfig {
 	return &BuiderConfig{
-		generator.NewGeneratorConfig(),
+		generator.NewGeneratorConfig(parserCodeGenConf),
 		compiler.NewCompilerConfig(),
+		&parser.Config{
+			ParserCodeGenConf: parserCodeGenConf,
+		},
 		"",
 	}
 }

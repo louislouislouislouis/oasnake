@@ -4,6 +4,7 @@ type State int
 
 const (
 	Ready State = iota
+	Parsing
 	Generating
 	WithCode
 	Compiling
@@ -16,6 +17,8 @@ const (
 
 func (s State) String() string {
 	switch s {
+	case Parsing:
+		return "Parsing"
 	case Ready:
 		return "Ready"
 	case Generating:
