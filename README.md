@@ -171,10 +171,7 @@ The result is a standalone Go project in the output directory, ready to be compi
 
 ## 🗺️ Roadmap
 
-- [ ] Add usage for reserved keyword
-- [ ] Add default value for compilation (go).
 - [ ] Better management of stdOut and stdErr for output of compilation.
-- [ ] Autodetection of the host OS as the default value for `target-os` and `target-arch`.
 - [ ] Docker compilation : create custom image. Search for this image. Create if not. Use after.
 - [ ] Add installation option.
 

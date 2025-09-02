@@ -21,7 +21,7 @@ func (cfg *BuiderConfig) NeedToInstall() bool {
 }
 
 func (cfg *BuiderConfig) NeedToCompile() bool {
-	return (cfg.CompilerConfig.CompileWithGo || cfg.CompilerConfig.CompileWithDocker)
+	return (cfg.CompilerConfig.Compile || cfg.CompilerConfig.CompileWithGo || cfg.CompilerConfig.CompileWithDocker)
 }
 
 func (cfg *BuiderConfig) GetCompiler() (compiler.Compiler, error) {

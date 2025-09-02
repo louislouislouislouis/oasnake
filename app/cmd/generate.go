@@ -39,11 +39,12 @@ func NewGenerateCommand() *cobra.Command {
 	cmd.PersistentFlags().StringVarP(&builderCfg.GeneratorConfig.CommandName, "name", "n", "", "The root command name (and usage), if not provided, it will be set to the info name from the OpenAPI spec. If it is not find, it will be a random name")
 
 	// Compiler flags
+	cmd.PersistentFlags().BoolVar(&builderCfg.CompilerConfig.Compile, "compile", false, "create binary using go compiler. If set to true, it would use by default the go compiler. You can override this by setting either --compile-with-go or --compile-with-docker to true.")
 	cmd.PersistentFlags().BoolVar(&builderCfg.CompilerConfig.CompileWithGo, "compile-with-go", false, "create binary using go compiler. This will only work if you have go installed and in your PATH.")
 	cmd.PersistentFlags().BoolVar(&builderCfg.CompilerConfig.CompileWithDocker, "compile-with-docker", false, "create binary using docker. This will only work if you have docker installed and in your PATH.")
 	cmd.MarkFlagsMutuallyExclusive("compile-with-go", "compile-with-docker")
-	cmd.PersistentFlags().StringVar(&builderCfg.CompilerConfig.TargetOs, "target-os", "", "OS for the generated binary. Would be setup as env var in the GOOS env while compiling")
-	cmd.PersistentFlags().StringVar(&builderCfg.CompilerConfig.TargetArch, "target-arch", "", "Architecture for the generated binary. Would be setup as env var in the GOARCH env while compiling")
+	cmd.PersistentFlags().StringVar(&builderCfg.CompilerConfig.TargetOs, "target-os", "", "OS for the generated binary. Would be setup as env var in the GOOS env while compiling. Defaults to the current OS if not specified.")
+	cmd.PersistentFlags().StringVar(&builderCfg.CompilerConfig.TargetArch, "target-arch", "", "Architecture for the generated binary. Would be setup as env var in the GOARCH env while compiling. Defaults to the current architecture if not specified.")
 	cmd.PersistentFlags().StringVarP(&builderCfg.CompilerConfig.BinaryName, "binary", "b", "", "Name of the binary file. If not specified, it will be the same as the command name.")
 
 	return cmd

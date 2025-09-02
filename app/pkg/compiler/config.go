@@ -3,6 +3,7 @@ package compiler
 type CompilerConfig struct {
 	OutputDirectory   string
 	BinaryName        string
+	Compile           bool
 	CompileWithGo     bool
 	CompileWithDocker bool
 	TargetOs          string

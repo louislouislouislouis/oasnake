@@ -2,7 +2,7 @@
 package builder
 
 import (
-	"fmt"
+	"runtime"
 
 	"github.com/louislouislouislouis/oasnake/app/pkg/builder/internal/state"
 	"github.com/louislouislouislouis/oasnake/app/pkg/builder/internal/state/events"
@@ -113,11 +113,13 @@ func (b *Builder) validateAndSanitizeConfig() error {
 
 		b.compiler.GetConfig().OutputDirectory = b.config.OutputDirectory
 
-		// Verify Target Arguments are present
-		if b.compiler.GetConfig().TargetOs == "" || b.compiler.GetConfig().TargetArch == "" {
-			return fmt.Errorf("a compilation has been requested, but no target OS or architecture are set for compilation")
+		// Set default target OS and architecture if not provided
+		if b.compiler.GetConfig().TargetOs == "" {
+			b.compiler.GetConfig().TargetOs = runtime.GOOS
 		}
-
+		if b.compiler.GetConfig().TargetArch == "" {
+			b.compiler.GetConfig().TargetArch = runtime.GOARCH
+		}
 	}
 
 	return nil
