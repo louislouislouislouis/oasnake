@@ -212,7 +212,7 @@ func (node *NodeCmd) GetUsage() string {
 		return node.GlobalConfig.RootUsage
 	}
 	if node.IsParam() {
-		return "<" + strings.Trim(node.segment, "{}") + ">"
+		return "[" + strings.Trim(node.segment, "{}") + "]"
 	}
 	return node.GetPackageName()
 }
